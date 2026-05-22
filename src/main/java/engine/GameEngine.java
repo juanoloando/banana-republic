@@ -9,13 +9,11 @@ import model.board.Intersection;
 import model.building.Laboratory;
 import model.building.Pipe;
 import model.building.Settlement;
-import model.card.CardCategory;
 import model.card.ExperimentCard;
 import model.card.KnightCard;
 import model.card.MonopolyCard;
 import model.card.RoadBuildingCard;
 import model.card.VictoryPointCard;
-import model.exception.InsufficientResourceException;
 import model.exception.InvalidBuildException;
 import model.player.HumanPlayer;
 import model.player.Player;
@@ -23,7 +21,6 @@ import model.player.SpecialCard;
 import model.resource.ResourceType;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,8 +44,10 @@ public class GameEngine {
 
     private DiceResult lastDiceResult;
     private boolean cardPlayedThisTurn;
-    private ExperimentCard cardPlayedThisTurnRef;
+    private ExperimentCard cardBoughtThisTurn;
     private int freeRoadsRemaining;
+    private boolean diceRolledThisTurn;
+    private int lastPlacedSettlementId;
 
     private final List<GameEngineListener> listeners;
 
@@ -71,8 +70,10 @@ public class GameEngine {
         this.tradeBuildPhaseHandler = new TradeBuildPhaseHandler();
         this.lastDiceResult = null;
         this.cardPlayedThisTurn = false;
-        this.cardPlayedThisTurnRef = null;
+        this.cardBoughtThisTurn = null;
         this.freeRoadsRemaining = 0;
+        this.diceRolledThisTurn = false;
+        this.lastPlacedSettlementId = -1;
         this.listeners = new ArrayList<>();
     }
 
@@ -101,6 +102,7 @@ public class GameEngine {
 
         int[] rolled = dice.roll();
         lastDiceResult = new DiceResult(rolled[0], rolled[1]);
+        diceRolledThisTurn = true;
 
         notifyListeners(l -> l.onDiceRolled(lastDiceResult));
         rollPhaseHandler.handle(state, this);
@@ -136,6 +138,7 @@ public class GameEngine {
             ((HumanPlayer) player).placeSettlement(intersectionId);
         }
 
+        lastPlacedSettlementId = intersectionId;
         notifyListeners(l -> l.onBuildingPlaced(player, intersectionId, "Settlement"));
 
         if (isSetup) {
@@ -207,7 +210,7 @@ public class GameEngine {
         if (state.getCurrentPhase() == TurnPhase.SETUP_PLACE_SECOND) {
             resourceDistributor.distributeInitialResources(
                     state.getBoard(), player,
-                    getLastSettlementForPlayer(player),
+                    lastPlacedSettlementId,
                     state.getBank()
             );
             notifyListeners(l -> l.onResourcesDistributed(player));
@@ -267,6 +270,7 @@ public class GameEngine {
             }
         }
 
+        cardBoughtThisTurn = card;
         notifyListeners(l -> l.onCardBought(player, card));
         return card;
     }
@@ -285,14 +289,13 @@ public class GameEngine {
             assert ((HumanPlayer) player).getInventory().getCards().contains(card)
                     : "Player " + player.getName() + " does not hold card: " + card.getCardName();
         }
-        assert card != cardPlayedThisTurnRef || cardPlayedThisTurnRef == null
-                : "Cannot play a card bought in the same turn (unless Victory Point in winning condition)";
+        assert !(card == cardBoughtThisTurn && !(card instanceof VictoryPointCard))
+                : "Cannot play a card bought in the same turn (except VictoryPointCard on winning condition)";
 
         if (player instanceof HumanPlayer) {
             ((HumanPlayer) player).getInventory().removeCard(card);
         }
         cardPlayedThisTurn = true;
-        cardPlayedThisTurnRef = card;
 
         if (card instanceof KnightCard) {
             if (player instanceof HumanPlayer) {
@@ -331,12 +334,15 @@ public class GameEngine {
         robberManager.moveRobber(state, newPosition);
         notifyListeners(l -> l.onRobberMoved(newPosition));
 
-        state.setCurrentPhase(TurnPhase.TRADE_BUILD);
-        notifyListeners(l -> l.onPhaseChanged(state.getCurrentPhase()));
-
-        if (!state.isSetupPhase()) {
-            startTradeBuildTimer();
+        if (!diceRolledThisTurn) {
+            state.setCurrentPhase(TurnPhase.ROLL_DICE);
+        } else {
+            state.setCurrentPhase(TurnPhase.TRADE_BUILD);
+            if (!state.isSetupPhase()) {
+                startTradeBuildTimer();
+            }
         }
+        notifyListeners(l -> l.onPhaseChanged(state.getCurrentPhase()));
     }
 
     public void discardResources(Player player, Map<ResourceType, Integer> toDiscard) {
@@ -394,8 +400,9 @@ public class GameEngine {
 
         tradeBuildPhaseHandler.handle(state, this);
         cardPlayedThisTurn = false;
-        cardPlayedThisTurnRef = null;
+        cardBoughtThisTurn = null;
         freeRoadsRemaining = 0;
+        diceRolledThisTurn = false;
 
         notifyListeners(l -> l.onTurnChanged(state.getActivePlayer()));
         notifyListeners(l -> l.onPhaseChanged(state.getCurrentPhase()));
@@ -454,8 +461,9 @@ public class GameEngine {
         notifyListeners(l -> l.onTimerExpired(state.getActivePlayer()));
         tradeBuildPhaseHandler.handle(state, this);
         cardPlayedThisTurn = false;
-        cardPlayedThisTurnRef = null;
+        cardBoughtThisTurn = null;
         freeRoadsRemaining = 0;
+        diceRolledThisTurn = false;
         notifyListeners(l -> l.onTurnChanged(state.getActivePlayer()));
         notifyListeners(l -> l.onPhaseChanged(state.getCurrentPhase()));
     }
@@ -466,8 +474,7 @@ public class GameEngine {
 
     private void checkVictoryCondition() {
         if (state.isGameOver()) return;
-        if (!state.getCurrentPhase().equals(TurnPhase.TRADE_BUILD)
-                && !state.isSetupPhase()) return;
+        if (state.getCurrentPhase() != TurnPhase.TRADE_BUILD) return;
 
         victoryManager.checkWinner(state).ifPresent(winner -> {
             state.setWinner(winner);
@@ -478,27 +485,13 @@ public class GameEngine {
 
     private void payBuildCost(Player player, model.building.BuildCost cost) {
         if (!player.canAfford(cost.getAllCosts())) {
-            throw new InsufficientResourceException(null, 0, 0) {
-                @Override
-                public String getMessage() {
-                    return "Player " + player.getName()
-                            + " cannot afford build cost: " + cost;
-                }
-            };
+            throw new InvalidBuildException(
+                    "Player " + player.getName() + " cannot afford build cost: " + cost);
         }
         for (Map.Entry<ResourceType, Integer> entry : cost.getAllCosts().entrySet()) {
             player.removeResource(entry.getKey(), entry.getValue());
             state.getBank().returnResource(entry.getKey(), entry.getValue());
         }
-    }
-
-    private int getLastSettlementForPlayer(Player player) {
-        if (!(player instanceof HumanPlayer)) return -1;
-        HumanPlayer hp = (HumanPlayer) player;
-        return hp.getOccupiedIntersectionIds().stream()
-                .mapToInt(Integer::intValue)
-                .max()
-                .orElse(-1);
     }
 
     private void notifyListeners(Consumer<GameEngineListener> action) {
