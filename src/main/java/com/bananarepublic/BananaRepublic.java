@@ -1,12 +1,12 @@
 package com.bananarepublic;
 
+import java.io.IOException;
+
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-
-import java.io.IOException;
 
 public class BananaRepublic extends Application {
     private static final double MIN_WINDOW_WIDTH = 1200;
@@ -39,7 +39,18 @@ public class BananaRepublic extends Application {
     }
 
     public static void showGame() throws Exception {
-        switchScene("/com/bananarepublic/fxml/game.fxml");
+        FXMLLoader loader = new FXMLLoader(
+                BananaRepublic.class.getResource("/com/bananarepublic/fxml/game.fxml")
+        );
+
+        Scene scene = new Scene(loader.load(), 1280, 720);
+        scene.getStylesheets().add(
+                BananaRepublic.class.getResource("/com/bananarepublic/css/app.css").toExternalForm()
+        );
+
+        primaryStage.setScene(scene);
+        primaryStage.setMaximized(true);
+        primaryStage.show();
     }
 
     public static void main(String[] args) {

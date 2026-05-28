@@ -1,18 +1,22 @@
 package com.bananarepublic.ui.controller;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
 import com.bananarepublic.BananaRepublic;
+import com.bananarepublic.session.GameSession;
+
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
-import javafx.scene.control.Tooltip;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.FileChooser;
-
-import java.io.File;
 
 public class LobbyController {
     private static final double DESIGN_WIDTH = 1280.0;
@@ -118,9 +122,10 @@ public class LobbyController {
         environmentDataFile = selectedFile;
         environmentFileLabel.setText(shortenFileName(selectedFile.getName()));
         environmentFileLabel.setTooltip(new Tooltip(selectedFile.getAbsolutePath()));
+
         System.out.println("Environment Data plugin selected: " + selectedFile.getAbsolutePath());
 
-        // TODO: sambungkan ke MapPluginLoader dari anggota 3
+        // TODO: sambungkan ke MapPluginLoader dari anggota 3.
     }
 
     @FXML
@@ -133,9 +138,10 @@ public class LobbyController {
         automationIntelligenceFile = selectedFile;
         automationFileLabel.setText(shortenFileName(selectedFile.getName()));
         automationFileLabel.setTooltip(new Tooltip(selectedFile.getAbsolutePath()));
+
         System.out.println("Automation Intelligence plugin selected: " + selectedFile.getAbsolutePath());
 
-        // TODO: sambungkan ke BotPluginLoader dari anggota 3
+        // TODO: sambungkan ke BotPluginLoader dari anggota 3.
     }
 
     @FXML
@@ -147,7 +153,20 @@ public class LobbyController {
             return;
         }
 
-        System.out.println("Start game with " + playerCount + " players.");
+        List<String> names = new ArrayList<>();
+        names.add(player1NameField.getText().trim());
+        names.add(player2NameField.getText().trim());
+        names.add(player3NameField.getText().trim());
+
+        if (playerCount == 4) {
+            names.add(player4NameField.getText().trim());
+        }
+
+        GameSession.setPlayerNames(names);
+        GameSession.clearLoadedSaveData();
+
+        System.out.println("Start new game with " + playerCount + " players.");
+        System.out.println("Players: " + names);
         System.out.println("Environment plugin: " + getFilePathOrDefault(environmentDataFile, "default map"));
         System.out.println("Automation plugin: " + getFilePathOrDefault(automationIntelligenceFile, "no bot plugin"));
 

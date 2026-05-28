@@ -1,15 +1,23 @@
 package com.bananarepublic.ui.controller;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.List;
 
 import com.bananarepublic.BananaRepublic;
+import com.bananarepublic.session.GameSession;
 
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.FileChooser;
+import persistence.JsonSaveLoadService;
+import persistence.SaveCorruptedException;
+import persistence.SaveData;
+import persistence.SaveLoadService;
 
 public class LoadGameController {
     private static final double DESIGN_WIDTH = 1280.0;
@@ -26,6 +34,8 @@ public class LoadGameController {
     private Label selectedFileLabel;
 
     private File selectedFile;
+
+    private final SaveLoadService saveLoadService = new JsonSaveLoadService();
 
     @FXML
     public void initialize() {
@@ -44,7 +54,7 @@ public class LoadGameController {
         fileChooser.setTitle("Choose Saved Game File");
 
         fileChooser.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("Save Files", "*.json", "*.ser"),
+                new FileChooser.ExtensionFilter("JSON Save Files", "*.json"),
                 new FileChooser.ExtensionFilter("All Files", "*.*")
         );
 
@@ -52,22 +62,44 @@ public class LoadGameController {
 
         if (selectedFile != null) {
             selectedFileLabel.setText(shortenFileName(selectedFile.getName()));
-            selectedFileLabel.setTooltip(new javafx.scene.control.Tooltip(selectedFile.getAbsolutePath()));
+            selectedFileLabel.setTooltip(new Tooltip(selectedFile.getAbsolutePath()));
         }
     }
 
     @FXML
-    private void onLoadGameClicked() throws Exception {
+    private void onLoadGameClicked() {
         if (selectedFile == null) {
             showWarning("Please choose a save file first.");
             return;
         }
 
-        System.out.println("Load game from: " + selectedFile.getAbsolutePath());
+        if (!saveLoadService.isValidSave(selectedFile)) {
+            showWarning("Selected file is not a valid JSON save file.");
+            return;
+        }
 
-        // TODO: panggil SaveLoadService dari anggota 3 / GameFactory dari anggota 5.
-        // Untuk sementara langsung masuk game screen dulu.
-        BananaRepublic.showGame();
+        try {
+            SaveData saveData = saveLoadService.load(selectedFile);
+
+            List<String> loadedNamesFromSave = saveData.players
+                    .stream()
+                    .map(playerData -> playerData.name)
+                    .toList();
+
+            GameSession.setPlayerNames(loadedNamesFromSave);
+            GameSession.setLoadedSaveData(saveData);
+
+            System.out.println("Load game from: " + selectedFile.getAbsolutePath());
+            System.out.println("Loaded players: " + loadedNamesFromSave);
+
+            BananaRepublic.showGame();
+        } catch (IOException e) {
+            showError("Failed to read save file:\n" + e.getMessage());
+        } catch (SaveCorruptedException e) {
+            showError("Save file is corrupted:\n" + e.getMessage());
+        } catch (Exception e) {
+            showError("Failed to load game:\n" + e.getMessage());
+        }
     }
 
     @FXML
@@ -83,11 +115,21 @@ public class LoadGameController {
         alert.showAndWait();
     }
 
+    private void showError(String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Load Game");
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
     private String shortenFileName(String fileName) {
         int maxLength = 24;
+
         if (fileName.length() <= maxLength) {
             return fileName;
         }
+
         return fileName.substring(0, 10) + "..." + fileName.substring(fileName.length() - 10);
     }
 }

@@ -3,6 +3,11 @@
     -fx-padding: 32px;
 }
 
+/* Pixel-font stack (akan pakai yang tersedia di sistem). */
+.root {
+    -fx-font-family: "Press Start 2P", "Minecraft", "Pixelify Sans", "Courier New";
+}
+
 .title {
     -fx-font-size: 48px;
     -fx-font-weight: bold;
@@ -182,4 +187,146 @@
     -fx-alignment: center-left;
     -fx-padding: -8 20px 0 28px;
     -fx-text-overrun: ellipsis;
+}
+
+.responsive-root {
+    -fx-background-color: black;
+}
+
+.transparent-click-zone {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.transparent-click-zone:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
+.transparent-click-zone:pressed {
+    -fx-background-color: rgba(0, 0, 0, 0.18);
+}
+
+.timer-label {
+    -fx-text-fill: white;
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-alignment: center-left;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 2, 0.3, 1, 1);
+}
+
+.logbook-scroll {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.logbook-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.logbook-content {
+    -fx-padding: 20 14 14 14;
+}
+
+.logbook-entry {
+    -fx-text-fill: #5b3513;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-padding: 2 0 2 0;
+    -fx-line-spacing: 2px;
+}
+
+.disabled-player-overlay {
+    -fx-background-color: rgba(0, 0, 0, 0.55);
+    -fx-background-insets: 0;
+    -fx-background-radius: 16px;
+}
+
+.popup-root {
+    -fx-background-color: transparent;
+}
+
+.popup-close-button {
+    -fx-background-color: rgba(80, 40, 12, 0.85);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.popup-overlay {
+    -fx-background-color: rgba(0, 0, 0, 0.35);
+}
+
+.player-name-label {
+    -fx-text-fill: #3f250d;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+    -fx-translate-y: 0;
+    -fx-padding: 0;
+    -fx-label-padding: 0;
+    -fx-font-family: "Press Start 2P", "Minecraft", "Pixelify Sans", "Courier New";
+}
+
+.player-stat-label {
+    -fx-text-fill: #4a2d12;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-alignment: center-left;
+    -fx-padding: 0;
+    -fx-label-padding: 0;
+}
+
+.player-click-zone {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-background-insets: 0;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.player-click-zone:hover {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
+
+.player-click-zone:pressed {
+    -fx-background-color: transparent;
+}
+
+.popup-close-hitbox {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.popup-close-hitbox:hover {
+    -fx-background-color: transparent;
+}
+
+.popup-close-hitbox:pressed {
+    -fx-background-color: transparent;
+}
+
+.settings-click-zone {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+    -fx-background-radius: 12px;
+}
+
+.settings-click-zone:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.02);
+    -fx-effect: dropshadow(gaussian, rgba(255, 248, 202, 0.35), 8, 0.2, 0, 0);
+}
+
+.settings-click-zone:pressed {
+    -fx-background-color: rgba(0, 0, 0, 0.08);
 }
