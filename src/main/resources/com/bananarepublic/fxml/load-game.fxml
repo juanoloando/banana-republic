@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.StackPane?>
+
+<StackPane xmlns="http://javafx.com/javafx"
+           xmlns:fx="http://javafx.com/fxml"
+           fx:id="rootPane"
+           fx:controller="com.bananarepublic.ui.controller.LoadGameController"
+           styleClass="responsive-root">
+
+<AnchorPane fx:id="designPane"
+            minWidth="1280"
+            minHeight="720"
+            prefWidth="1280"
+            prefHeight="720"
+            maxWidth="1280"
+            maxHeight="720">
+
+    <!-- Full background desain -->
+    <ImageView fitWidth="1280"
+               fitHeight="720"
+               preserveRatio="false"
+               smooth="true">
+        <image>
+            <Image url="@../images/loadgame/load_game_bg.png"/>
+        </image>
+    </ImageView>
+
+    <!-- Area klik CHOOSE FILE -->
+    <Button layoutX="549"
+            layoutY="308"
+            prefWidth="196"
+            prefHeight="56"
+            onAction="#onChooseFileClicked"
+            styleClass="transparent-click-zone"/>
+
+    <!-- Text selected file, ditaruh di atas kotak coklat -->
+    <Label fx:id="selectedFileLabel"
+           layoutX="440"
+           layoutY="425"
+           prefWidth="533"
+           prefHeight="84"
+           text="No File Chosen"
+           mouseTransparent="true"
+           styleClass="load-file-label"/>
+
+    <!-- Area klik LOAD GAME, tombol kiri -->
+    <Button layoutX="469"
+            layoutY="522"
+            prefWidth="178"
+            prefHeight="51"
+            onAction="#onLoadGameClicked"
+            styleClass="transparent-click-zone"/>
+
+    <!-- Area klik CANCEL, tombol kanan -->
+    <Button layoutX="661"
+            layoutY="522"
+            prefWidth="178"
+            prefHeight="51"
+            onAction="#onCancelClicked"
+            styleClass="transparent-click-zone"/>
+
+</AnchorPane>
+</StackPane>
