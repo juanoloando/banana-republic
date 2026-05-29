@@ -503,3 +503,116 @@
     -fx-font-size: 15px;
     -fx-font-weight: bold;
 }
+
+/* ============================================================
+   GAME REVISION STYLES
+   ============================================================ */
+
+.gr-turn-label {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 27px;
+    -fx-text-fill: white;
+    -fx-text-overrun: clip;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.7), 4, 0, 1, 1);
+}
+
+.gr-phase-label {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 20px;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.7), 4, 0, 1, 1);
+}
+
+.gr-timer-label {
+    -fx-font-family: "Intro";
+    -fx-font-size: 26px;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.7), 4, 0, 1, 1);
+}
+
+.gr-section-header {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 18px;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.7), 3, 0, 1, 1);
+}
+
+.gr-player-name {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 13px;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.gr-stat-label {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 11px;
+    -fx-text-fill: black;
+    -fx-font-weight: bold;
+}
+
+.gr-harbor-label {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 14px;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, black, 3, 0, 0, 1);
+}
+
+.gr-resource-card {
+    -fx-background-color: rgba(60,35,10,0.82);
+    -fx-background-radius: 8px;
+    -fx-border-color: rgba(200,150,60,0.6);
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 8px;
+}
+
+.gr-resource-name {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 11px;
+    -fx-text-fill: #f5e8c0;
+    -fx-font-weight: bold;
+}
+
+.gr-experiment-card {
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 4, 0, 1, 2);
+}
+
+.gr-badge-label {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 10px;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.gr-top-bar-btn {
+    -fx-font-family: "Arcade Normal";
+    -fx-background-color: rgba(60,35,10,0.85);
+    -fx-border-color: rgba(200,150,60,0.7);
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.gr-top-bar-btn:hover {
+    -fx-background-color: rgba(90,55,15,0.9);
+}
+
+.gr-info-pane {
+    -fx-background-color: rgba(30,18,5,0.55);
+    -fx-background-radius: 10px;
+    -fx-border-color: rgba(180,130,50,0.4);
+    -fx-border-width: 1px;
+    -fx-border-radius: 10px;
+}
+
+.gr-log-entry {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 10px;
+    -fx-text-fill: #3b2108;
+    -fx-wrap-text: true;
+}

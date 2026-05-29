@@ -21,11 +21,11 @@ import model.board.HexTile;
 import model.board.TerrainType;
 
 public class HexRenderer {
-    private static final double TILE_RENDER_WIDTH = 149.0;
-    private static final double TILE_RENDER_HEIGHT = 139.0;
-    private static final double HEX_CENTER_SPACING_X = 174.0;
-    private static final double HEX_CENTER_SPACING_Y = 118.0;
-    private static final double BOARD_ANCHOR_X = 432.0;
+    private static final double TILE_RENDER_WIDTH = 118.0;
+    private static final double TILE_RENDER_HEIGHT = 113.0;
+    private static final double HEX_CENTER_SPACING_X = 0.0;
+    private static final double HEX_CENTER_SPACING_Y = 0.0;
+    private static final double BOARD_ANCHOR_X = 670.0;
     private static final double BOARD_ANCHOR_Y = 313.0;
     private static final double TOKEN_OFFSET_X = 0.0;
     private static final double TOKEN_OFFSET_Y = 44.0;

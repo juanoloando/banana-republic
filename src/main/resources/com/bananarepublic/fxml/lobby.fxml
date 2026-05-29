@@ -42,7 +42,7 @@
                 onAction="#onSettingsClicked"
                 styleClass="transparent-click-zone"/>
 
-        <!-- Toggle Number of Players, di dalam border kayu -->
+        <!-- Toggle Number of Players -->
         <HBox layoutX="318"
               layoutY="280"
               spacing="12">
@@ -88,7 +88,7 @@
                    prefHeight="39"
                    styleClass="wood-input"/>
 
-        <!-- Environment Data label di atas kotak -->
+        <!-- Environment Data label -->
         <Label fx:id="environmentFileLabel"
                layoutX="633"
                layoutY="290"
@@ -98,7 +98,7 @@
                mouseTransparent="true"
                styleClass="plugin-file-label"/>
 
-        <!-- Environment Data upload click zone, tombol kecil kanan -->
+        <!-- Environment Data upload click zone -->
         <Button layoutX="1002"
                 layoutY="299"
                 prefWidth="55"
@@ -106,7 +106,7 @@
                 onAction="#onEnvironmentDataClicked"
                 styleClass="transparent-click-zone"/>
 
-        <!-- Automation Intelligence label di atas kotak -->
+        <!-- Automation Intelligence label -->
         <Label fx:id="automationFileLabel"
                layoutX="633"
                layoutY="448"
@@ -116,7 +116,7 @@
                mouseTransparent="true"
                styleClass="plugin-file-label"/>
 
-        <!-- Automation Intelligence upload click zone, tombol kecil kanan -->
+        <!-- Automation Intelligence upload click zone -->
         <Button layoutX="1002"
                 layoutY="463"
                 prefWidth="55"
