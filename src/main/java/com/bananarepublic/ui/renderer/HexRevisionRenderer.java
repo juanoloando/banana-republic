@@ -1,17 +1,20 @@
 package com.bananarepublic.ui.renderer;
 
 import com.bananarepublic.BananaRepublic;
+import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import model.board.*;
 
 import java.util.*;
+import java.util.function.Consumer;
 
 public class HexRevisionRenderer {
 
@@ -162,6 +165,92 @@ public class HexRevisionRenderer {
             case ORE    -> "2:1";
             default     -> "2:1";
         };
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  Build-mode indicators
+    // ──────────────────────────────────────────────────────────────
+
+    private static final String BUILD_TAG = "build-indicator";
+    // Radius of the red clickable circle in board coordinates
+    private static final double BUILD_CIRCLE_RADIUS = 11.0;
+
+    /**
+     * Renders clickable red circles at every valid build location.
+     *
+     * @param settlementIds  intersections where a new outpost can be built
+     * @param labIds         intersections where a lab upgrade is possible
+     * @param pipeIds        path IDs where a pipe can be built
+     * @param board          the Board object (needed for path endpoints & intersection coords)
+     * @param onIntersection called with (intersectionId, isLab) when a circle is clicked
+     * @param onPath         called with pathId when a pipe circle is clicked
+     */
+    public void renderBuildableLocations(Pane boardPane,
+                                          Set<Integer> settlementIds,
+                                          Set<Integer> labIds,
+                                          Set<Integer> pipeIds,
+                                          Board board,
+                                          java.util.function.BiConsumer<Integer, Boolean> onIntersection,
+                                          Consumer<Integer> onPath) {
+        clearBuildableLocations(boardPane);
+        Map<Integer, PixelPoint> intPos = computeIntersectionPositions(board);
+
+        for (int id : settlementIds) {
+            PixelPoint p = intPos.get(id);
+            if (p == null) continue;
+            addBuildCircle(boardPane, p, () -> onIntersection.accept(id, false));
+        }
+        for (int id : labIds) {
+            PixelPoint p = intPos.get(id);
+            if (p == null) continue;
+            addBuildCircle(boardPane, p, () -> onIntersection.accept(id, true));
+        }
+        for (int pathId : pipeIds) {
+            board.getPath(pathId).ifPresent(path -> {
+                PixelPoint a = intPos.get(path.getIntersectionIdA());
+                PixelPoint b = intPos.get(path.getIntersectionIdB());
+                if (a == null || b == null) return;
+                PixelPoint mid = new PixelPoint((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0);
+                addBuildCircle(boardPane, mid, () -> onPath.accept(pathId));
+            });
+        }
+    }
+
+    /** Removes all build-mode circles from boardPane. */
+    public void clearBuildableLocations(Pane boardPane) {
+        boardPane.getChildren().removeIf(n -> BUILD_TAG.equals(n.getUserData()));
+    }
+
+    private void addBuildCircle(Pane boardPane, PixelPoint pos, Runnable onClick) {
+        Circle circle = new Circle(pos.x(), pos.y(), BUILD_CIRCLE_RADIUS);
+        circle.setFill(Color.RED);
+        circle.setOpacity(0.72);
+        circle.setStroke(Color.WHITE);
+        circle.setStrokeWidth(1.5);
+        circle.setCursor(Cursor.HAND);
+        circle.setUserData(BUILD_TAG);
+        circle.setOnMouseClicked(e -> { e.consume(); onClick.run(); });
+        boardPane.getChildren().add(circle);
+    }
+
+    /**
+     * Computes pixel positions for all intersections by averaging the pixel
+     * centres of their adjacent hex tiles.
+     */
+    public Map<Integer, PixelPoint> computeIntersectionPositions(Board board) {
+        Map<Integer, PixelPoint> result = new HashMap<>();
+        for (Intersection intersection : board.getAllIntersections()) {
+            List<HexCoordinate> adj = intersection.getAdjacentTileCoords();
+            if (adj.isEmpty()) continue;
+            double x = 0, y = 0;
+            for (HexCoordinate c : adj) {
+                PixelPoint p = toCenterPoint(c);
+                x += p.x();
+                y += p.y();
+            }
+            result.put(intersection.getId(), new PixelPoint(x / adj.size(), y / adj.size()));
+        }
+        return result;
     }
 
     // ──────────────────────────────────────────────────────────────

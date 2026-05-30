@@ -164,5 +164,50 @@
 
         <Button fx:id="popupCloseButton" layoutX="1390" layoutY="175" managed="false" onAction="#onClosePopupClicked" prefHeight="60" prefWidth="60" styleClass="transparent-click-zone" visible="false" />
 
+        <!-- ═══════════════════════════════════════════════════════
+             BUILD POPUPS  (centered: pipe 855×553, building 855×702)
+             Design center: 1920/2=960, 1080/2=540
+             ═══════════════════════════════════════════════════════ -->
+
+        <!-- PIPE popup — shown when player clicks a pipe build circle -->
+        <Pane fx:id="pipePopupPane" layoutX="533" layoutY="264" managed="false" prefHeight="553" prefWidth="855" visible="false">
+
+            <!-- Background image -->
+            <ImageView fitHeight="553" fitWidth="855" preserveRatio="false" smooth="true">
+                <image><Image url="@../images/game_revision/popup_pipe.png" /></image>
+            </ImageView>
+
+            <!-- X close button (opacity 0 — icon already on image, top-right ~x=785,y=13) -->
+            <Button layoutX="785" layoutY="13" onAction="#onCloseBuildPopup" opacity="0.0" prefHeight="62" prefWidth="62" styleClass="transparent-click-zone" />
+
+            <!-- BUILD button image -->
+            <ImageView fitHeight="50" fitWidth="153" layoutX="351" layoutY="493" preserveRatio="false" smooth="true">
+                <image><Image url="@../images/game_revision/btn_build.png" /></image>
+            </ImageView>
+            <!-- BUILD button hitbox -->
+            <Button layoutX="351" layoutY="493" onAction="#onBuildConfirmed" opacity="0.0" prefHeight="50" prefWidth="153" styleClass="transparent-click-zone" />
+
+        </Pane>
+
+        <!-- BUILDING popup — shown when player clicks an intersection build circle -->
+        <Pane fx:id="buildingPopupPane" layoutX="533" layoutY="189" managed="false" prefHeight="702" prefWidth="855" visible="false">
+
+            <!-- Background image -->
+            <ImageView fitHeight="702" fitWidth="855" preserveRatio="false" smooth="true">
+                <image><Image url="@../images/game_revision/popup_building.png" /></image>
+            </ImageView>
+
+            <!-- X close button -->
+            <Button layoutX="785" layoutY="13" onAction="#onCloseBuildPopup" opacity="0.0" prefHeight="62" prefWidth="62" styleClass="transparent-click-zone" />
+
+            <!-- BUILD button image -->
+            <ImageView fitHeight="50" fitWidth="153" layoutX="351" layoutY="642" preserveRatio="false" smooth="true">
+                <image><Image url="@../images/game_revision/btn_build.png" /></image>
+            </ImageView>
+            <!-- BUILD button hitbox -->
+            <Button layoutX="351" layoutY="642" onAction="#onBuildConfirmed" opacity="0.0" prefHeight="50" prefWidth="153" styleClass="transparent-click-zone" />
+
+        </Pane>
+
     </AnchorPane>
 </StackPane>

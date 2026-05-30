@@ -3,9 +3,13 @@ package com.bananarepublic.ui.controller;
 import com.bananarepublic.BananaRepublic;
 import com.bananarepublic.session.GameSession;
 import com.bananarepublic.ui.renderer.HexRevisionRenderer;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
+import javafx.util.Duration;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -18,6 +22,8 @@ import model.card.CardCategory;
 import model.player.Player;
 import model.resource.ResourceType;
 import persistence.SaveData;
+
+import java.util.function.BiConsumer;
 
 import java.util.*;
 
@@ -96,15 +102,40 @@ public class GameRevisionController {
     @FXML private ImageView popupImageView;
     @FXML private Button popupCloseButton;
 
+    // Build popups
+    @FXML private Pane pipePopupPane;
+    @FXML private Pane buildingPopupPane;
+
     // ── State ─────────────────────────────────────────────────────────
     private final HexRevisionRenderer hexRevisionRenderer = new HexRevisionRenderer();
     private final Map<ResourceType, Label> resourceBadgeLabels = new EnumMap<>(ResourceType.class);
+
+    // Build mode state
+    private enum BuildType { NONE, OUTPOST, LAB, PIPE }
+    private BuildType pendingBuildType = BuildType.NONE;
+    private int pendingBuildId = -1;
     private final Map<Integer, HBox> playerCardBoxes = new HashMap<>();
     private int playerCount = 4;
+    private int activePlayerIndex = 0;
     private Font arcadeFont;
     private Font introFont;
     // Currently visible info panel ("log", "bank", or "" for none)
     private String activeInfoPanel = "";
+
+    // ── Timer state ──────────────────────────────────────────────────
+    private static final int DEFAULT_TURN_SECONDS = 90;
+    private Timeline timerTimeline;
+    private int remainingSeconds = DEFAULT_TURN_SECONDS;
+
+    // ── Dice state ────────────────────────────────────────────────────
+    private Timeline diceTimeline;
+    private ImageView diceView1;
+    private ImageView diceView2;
+    private boolean diceRolled = false;
+    private static final double DICE_SIZE   = 78.0;
+    private static final double DICE_X1     = 608.0;  // position of die 1 on boardPane
+    private static final double DICE_X2     = 700.0;  // position of die 2 on boardPane
+    private static final double DICE_Y      = 868.0;
 
     // ── Lifecycle ────────────────────────────────────────────────────
     @FXML
@@ -119,6 +150,7 @@ public class GameRevisionController {
         initBankStock();
         updatePhaseDisplay(false);
         hidePopup();
+        startTurnTimer(DEFAULT_TURN_SECONDS);
     }
 
     private void setupResponsiveScaling() {
@@ -568,6 +600,216 @@ public class GameRevisionController {
         });
     }
 
+    // ── Timer ────────────────────────────────────────────────────────
+
+    /**
+     * Start (or restart) the turn countdown timer.
+     * Called automatically at turn start and by bridge layer.
+     */
+    public void startTurnTimer(int seconds) {
+        stopTimer();
+        remainingSeconds = seconds;
+        updateTimerDisplay();
+        timerTimeline = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
+            remainingSeconds--;
+            updateTimerDisplay();
+            if (remainingSeconds <= 0) {
+                stopTimer();
+                appendLog("⏱ Waktu habis — giliran berakhir otomatis.");
+                performEndTurn();
+            }
+        }));
+        timerTimeline.setCycleCount(Timeline.INDEFINITE);
+        timerTimeline.play();
+    }
+
+    public void stopTimer() {
+        if (timerTimeline != null) {
+            timerTimeline.stop();
+            timerTimeline = null;
+        }
+    }
+
+    private void updateTimerDisplay() {
+        if (timerLabel == null) return;
+        int m = remainingSeconds / 60;
+        int s = remainingSeconds % 60;
+        timerLabel.setText(String.format("%02d:%02d", m, s));
+    }
+
+    // ── Dice ─────────────────────────────────────────────────────────
+
+    private void startDiceAnimation() {
+        setupDiceViews();
+        diceRolled = true;
+
+        // 80 ms per frame × 25 frames ≈ 2 seconds of animation
+        diceTimeline = new Timeline(new KeyFrame(Duration.millis(80), e -> {
+            if (diceView1 != null) diceView1.setImage(loadDiceImage(randomFace()));
+            if (diceView2 != null) diceView2.setImage(loadDiceImage(randomFace()));
+        }));
+        diceTimeline.setCycleCount(25);
+        diceTimeline.setOnFinished(e -> finalizeDiceRoll());
+        diceTimeline.play();
+    }
+
+    private void setupDiceViews() {
+        clearDiceDisplay();
+        diceView1 = makeDiceView(DICE_X1, DICE_Y);
+        diceView2 = makeDiceView(DICE_X2, DICE_Y);
+        diceView1.setImage(loadDiceImage(1));
+        diceView2.setImage(loadDiceImage(1));
+        boardPane.getChildren().addAll(diceView1, diceView2);
+    }
+
+    private ImageView makeDiceView(double x, double y) {
+        ImageView iv = new ImageView();
+        iv.setFitWidth(DICE_SIZE);
+        iv.setFitHeight(DICE_SIZE);
+        iv.setLayoutX(x);
+        iv.setLayoutY(y);
+        iv.setSmooth(true);
+        iv.setUserData("dice-display");
+        return iv;
+    }
+
+    private void finalizeDiceRoll() {
+        int f1 = randomFace();
+        int f2 = randomFace();
+        if (diceView1 != null) diceView1.setImage(loadDiceImage(f1));
+        if (diceView2 != null) diceView2.setImage(loadDiceImage(f2));
+        appendLog("🎲 " + f1 + " + " + f2 + " = " + (f1 + f2));
+        // TODO: notify bridge layer → GameEngine.rollDice(f1, f2)
+    }
+
+    private void clearDiceDisplay() {
+        boardPane.getChildren().removeIf(n -> "dice-display".equals(n.getUserData()));
+        diceView1 = null;
+        diceView2 = null;
+    }
+
+    private static int randomFace() {
+        return (int) (Math.random() * 6) + 1;
+    }
+
+    private Image loadDiceImage(int face) {
+        String path = "/com/bananarepublic/images/game_revision/dice" + face + ".png";
+        return new Image(getClass().getResource(path).toExternalForm());
+    }
+
+    // ── End Turn ─────────────────────────────────────────────────────
+
+    /** Core end-turn logic: stop timer, clear state, advance player, restart timer. */
+    private void performEndTurn() {
+        stopTimer();
+        exitBuildMode();
+        clearDiceDisplay();
+        diceRolled = false;
+        hideBuildPopup();
+        advanceToNextPlayer();
+        startTurnTimer(DEFAULT_TURN_SECONDS);
+    }
+
+    private void advanceToNextPlayer() {
+        List<String> names = GameSession.getPlayerNames();
+        if (names.isEmpty()) return;
+        activePlayerIndex = (activePlayerIndex + 1) % names.size();
+        String nextName = names.get(activePlayerIndex);
+        updateTurnDisplay(nextName);
+        updatePhaseDisplay(false);
+
+        // Clear inventory for next player (engine will populate via refreshInventory)
+        inventoryResourceRow.getChildren().clear();
+        inventoryCardRow.getChildren().clear();
+        resourceBadgeLabels.clear();
+
+        appendLog("─── Giliran " + nextName + " ───");
+    }
+
+    // ── Build mode ───────────────────────────────────────────────────
+
+    /**
+     * Shows red circles on all valid build locations for the current player.
+     * Called by the bridge layer when it's the player's TRADE_BUILD phase.
+     *
+     * @param settlementIds  intersections where a new outpost can be placed
+     * @param labIds         intersections where an existing outpost can be upgraded to lab
+     * @param pipeIds        path IDs where a pipe can be placed
+     * @param board          current board state
+     */
+    public void enterBuildMode(Set<Integer> settlementIds,
+                                Set<Integer> labIds,
+                                Set<Integer> pipeIds,
+                                Board board) {
+        hexRevisionRenderer.renderBuildableLocations(
+            boardPane, settlementIds, labIds, pipeIds, board,
+            this::onIntersectionCircleClicked,
+            this::onPathCircleClicked
+        );
+    }
+
+    /** Removes all build circles and closes any open build popup. */
+    public void exitBuildMode() {
+        hexRevisionRenderer.clearBuildableLocations(boardPane);
+        hideBuildPopup();
+        pendingBuildType = BuildType.NONE;
+        pendingBuildId   = -1;
+    }
+
+    private void onIntersectionCircleClicked(int intersectionId, boolean isLab) {
+        pendingBuildType = isLab ? BuildType.LAB : BuildType.OUTPOST;
+        pendingBuildId   = intersectionId;
+        showBuildPopup(false); // building popup
+    }
+
+    private void onPathCircleClicked(int pathId) {
+        pendingBuildType = BuildType.PIPE;
+        pendingBuildId   = pathId;
+        showBuildPopup(true); // pipe popup
+    }
+
+    private void showBuildPopup(boolean isPipe) {
+        hideBuildPopup();
+        Pane popup = isPipe ? pipePopupPane : buildingPopupPane;
+        popup.setVisible(true);
+        popup.setManaged(true);
+        popup.toFront();
+    }
+
+    private void hideBuildPopup() {
+        pipePopupPane.setVisible(false);
+        pipePopupPane.setManaged(false);
+        buildingPopupPane.setVisible(false);
+        buildingPopupPane.setManaged(false);
+    }
+
+    @FXML
+    private void onCloseBuildPopup() {
+        hideBuildPopup();
+        pendingBuildType = BuildType.NONE;
+        pendingBuildId   = -1;
+        // Build circles remain — player can still choose to build something else
+    }
+
+    /**
+     * Called when the BUILD button inside a popup is clicked.
+     * Delegates to the bridge layer via the appropriate GameEngine call.
+     * Override/extend this when connecting to the engine.
+     */
+    @FXML
+    public void onBuildConfirmed() {
+        switch (pendingBuildType) {
+            case OUTPOST -> appendLog("Build outpost at intersection " + pendingBuildId + " — TODO: connect to GameEngine.buildSettlement()");
+            case LAB     -> appendLog("Build lab at intersection " + pendingBuildId     + " — TODO: connect to GameEngine.upgradeLaboratory()");
+            case PIPE    -> appendLog("Build pipe at path "        + pendingBuildId     + " — TODO: connect to GameEngine.buildPipe()");
+            default      -> {}
+        }
+        hideBuildPopup();
+        // Circles are cleared after a successful build by the engine callback;
+        // for now just exit build mode to prevent duplicate builds.
+        exitBuildMode();
+    }
+
     // ── Popup ────────────────────────────────────────────────────────
     private void hidePopup() {
         popupOverlay.setVisible(false);
@@ -595,7 +837,16 @@ public class GameRevisionController {
     }
 
     // ── Button handlers ──────────────────────────────────────────────
-    @FXML private void onRollDiceClicked()  { /* TODO: connect to GameEngine */ }
+    @FXML
+    private void onRollDiceClicked() {
+        if (diceRolled && (diceTimeline == null || diceTimeline.getStatus() == Animation.Status.STOPPED)) {
+            return; // already rolled and animation finished — ignore
+        }
+        if (diceTimeline != null && diceTimeline.getStatus() == Animation.Status.RUNNING) {
+            return; // animation already running
+        }
+        startDiceAnimation();
+    }
     @FXML private void onTradeClicked()    { TradeDialogController.showDialog(); }
     @FXML private void onBuyCardClicked()  { /* TODO: connect to GameEngine */ }
 
@@ -612,7 +863,15 @@ public class GameRevisionController {
         toggleInfoPanel("bank");
     }
     @FXML private void onDeclareVictoryClicked() { /* TODO: victory check */ }
-    @FXML private void onEndTurnClicked()        { /* TODO: connect to GameEngine */ }
+    @FXML
+    public void onEndTurnClicked() {
+        // If dice is still spinning, stop immediately and resolve
+        if (diceTimeline != null && diceTimeline.getStatus() == Animation.Status.RUNNING) {
+            diceTimeline.stop();
+            finalizeDiceRoll();
+        }
+        performEndTurn();
+    }
 
     @FXML
     private void onSaveClicked() {
