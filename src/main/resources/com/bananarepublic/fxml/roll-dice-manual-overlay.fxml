@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.Group?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.StackPane?>
+
+<StackPane fx:id="overlayRoot" managed="false" maxHeight="Infinity" maxWidth="Infinity" pickOnBounds="true"
+           styleClass="trade-modal-root" visible="false"
+           xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="com.bananarepublic.ui.controller.RollDiceManualOverlayController">
+    <children>
+        <Pane fx:id="overlayBackdrop" maxHeight="Infinity" maxWidth="Infinity" prefHeight="1080.0" prefWidth="1920.0"
+              styleClass="popup-overlay"/>
+        <StackPane fx:id="centerLayer" alignment="CENTER" pickOnBounds="false">
+            <children>
+                <Group fx:id="modalScaleGroup" StackPane.alignment="CENTER">
+                    <children>
+                        <Pane fx:id="popupContainer" prefHeight="722.0" prefWidth="887.0">
+                            <children>
+                                <ImageView fx:id="popupImageView" fitHeight="722.0" fitWidth="887.0" mouseTransparent="true"
+                                           preserveRatio="false" smooth="true">
+                                    <image>
+                                        <Image url="@../images/dice/Roll%20Dice%20Manual.png"/>
+                                    </image>
+                                </ImageView>
+
+                                <ComboBox fx:id="dice1ComboBox" layoutX="222.0" layoutY="335.0" prefHeight="34.0" prefWidth="125.0" />
+                                <ComboBox fx:id="dice2ComboBox" layoutX="540.0" layoutY="335.0" prefHeight="34.0" prefWidth="125.0" />
+
+                                <ImageView fx:id="dice1ImageView" fitHeight="84.0" fitWidth="84.0" layoutX="242.0" layoutY="390.0" preserveRatio="true" smooth="true" />
+                                <ImageView fx:id="dice2ImageView" fitHeight="84.0" fitWidth="84.0" layoutX="560.0" layoutY="390.0" preserveRatio="true" smooth="true" />
+
+                                <Label fx:id="diceManualErrorLabel" alignment="CENTER" layoutX="142.0" layoutY="540.0"
+                                       managed="false" prefHeight="26.0" prefWidth="603.0"
+                                       styleClass="dice-manual-error-label" visible="false" />
+
+                                <Button fx:id="cancelButton" onAction="#onCancelClicked" opacity="0.0" prefHeight="52.0" prefWidth="199.0" styleClass="trade-click-zone" />
+                                <Button fx:id="rollDiceButton" onAction="#onRollDiceClicked" opacity="0.0" prefHeight="52.0" prefWidth="199.0" styleClass="trade-click-zone" />
+                            </children>
+                        </Pane>
+                    </children>
+                </Group>
+            </children>
+        </StackPane>
+    </children>
+</StackPane>
