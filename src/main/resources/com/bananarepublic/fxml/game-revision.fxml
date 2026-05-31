@@ -10,6 +10,8 @@
 <?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+
+<?import javafx.scene.Group?>
 <?import javafx.scene.text.Font?>
 
 <StackPane fx:id="rootPane" styleClass="responsive-root" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bananarepublic.ui.controller.GameRevisionController">
@@ -35,7 +37,7 @@
                          Pixel-located at y≈973..1075, x=[655,770,879,989,1099,1209]
                          ═══════════════════════════════════════════════════════ -->
       
-                    <Button layoutX="655.0" layoutY="971.0" onAction="#onRollDiceClicked" opacity="0.0" prefHeight="92.0" prefWidth="100.0" styleClass="transparent-click-zone" />
+                    <Button fx:id="diceButton" layoutX="655.0" layoutY="971.0" onMouseClicked="#onDiceButtonMouseClicked" opacity="0.0" prefHeight="92.0" prefWidth="100.0" styleClass="transparent-click-zone" />
          </children></Pane>
 
         <!-- ═══════════════════════════════════════════════════════
@@ -158,11 +160,7 @@
         <!-- ═══════════════════════════════════════════════════════
              POPUP OVERLAY
              ═══════════════════════════════════════════════════════ -->
-        <Pane fx:id="popupOverlay" layoutX="0" layoutY="0" managed="false" prefHeight="1080" prefWidth="1920" styleClass="popup-overlay" visible="false" />
-
-        <ImageView fx:id="popupImageView" fitHeight="753" fitWidth="1048" layoutX="436" layoutY="164" managed="false" preserveRatio="true" smooth="true" visible="false" />
-
-        <Button fx:id="popupCloseButton" layoutX="1390" layoutY="175" managed="false" onAction="#onClosePopupClicked" prefHeight="60" prefWidth="60" styleClass="transparent-click-zone" visible="false" />
+        
 
         <!-- ═══════════════════════════════════════════════════════
              BUILD POPUPS  (centered: pipe 855×553, building 855×702)
@@ -210,4 +208,76 @@
         </Pane>
 
     </AnchorPane>
+    <StackPane fx:id="tradeOverlayRoot" managed="false" maxHeight="Infinity" maxWidth="Infinity" pickOnBounds="true" styleClass="trade-modal-root" visible="false">
+        <children>
+            <Pane fx:id="popupOverlay" managed="false" maxHeight="Infinity" maxWidth="Infinity" prefHeight="1080" prefWidth="1920" styleClass="popup-overlay" visible="false" />
+            <StackPane fx:id="tradeOverlayCenterLayer" alignment="CENTER" pickOnBounds="false">
+                <children>
+                    <Group fx:id="tradeModalScaleGroup" StackPane.alignment="CENTER">
+                        <children>
+<AnchorPane fx:id="tradePopupContainer" translateX="0.0" translateY="0.0" managed="false" prefHeight="753" prefWidth="1048" visible="false">
+            <children>
+                <ImageView fx:id="popupImageView" fitHeight="753" fitWidth="1048" managed="false" mouseTransparent="true" preserveRatio="false" smooth="true" visible="false" />
+                <AnchorPane fx:id="tradeUiPane" managed="false" prefHeight="753" prefWidth="1048" visible="false" />
+                <Label fx:id="tradeErrorLabel" managed="false" prefHeight="28" prefWidth="880" styleClass="trade-error-label" visible="false" />
+                <Label fx:id="playerTradeMessageLabel" managed="false" prefHeight="30" prefWidth="610" styleClass="trade-error-label" visible="false" />
+                <HBox fx:id="tradeActionButtonsBox" alignment="CENTER" managed="false" prefHeight="44" prefWidth="532" spacing="18" visible="false" />
+                <Button fx:id="popupCloseButton" managed="false" onAction="#onClosePopupClicked" opacity="0.0" prefHeight="60" prefWidth="60" styleClass="transparent-click-zone" visible="false" />
+                <Button fx:id="tradeChoiceBankButton" managed="false" onAction="#onTradeChoiceBankClicked" opacity="0.0" prefHeight="74" prefWidth="175" styleClass="transparent-click-zone" visible="false" />
+                <Button fx:id="tradeChoicePlayerButton" managed="false" onAction="#onTradeChoicePlayerClicked" opacity="0.0" prefHeight="75" prefWidth="175" styleClass="transparent-click-zone" visible="false" />
+                <Button fx:id="tradeChoiceHarborButton" managed="false" onAction="#onTradeChoiceHarborClicked" opacity="0.0" prefHeight="73" prefWidth="173" styleClass="transparent-click-zone" visible="false" />
+
+                <!-- Bank Trade specific controls -->
+                <Label fx:id="bankTradeMessageLabel" alignment="CENTER" managed="false" prefHeight="24" prefWidth="760" visible="false" />
+
+                <Label fx:id="bankBananaQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="bankWoodQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="bankWheatQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="bankOreQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="bankBrickQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+
+                <Label fx:id="youBananaQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="youWoodQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="youWheatQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="youOreQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="youBrickQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+
+                <Label fx:id="bankBananaCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="bankWoodCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="bankWheatCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="bankOreCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="bankBrickCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+
+                <Label fx:id="youBananaCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="youWoodCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="youWheatCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="youOreCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="youBrickCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+
+                <Button fx:id="bankBananaSelectButton" managed="false" onAction="#onBankBananaSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="bankWoodSelectButton" managed="false" onAction="#onBankWoodSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="bankWheatSelectButton" managed="false" onAction="#onBankWheatSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="bankOreSelectButton" managed="false" onAction="#onBankOreSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="bankBrickSelectButton" managed="false" onAction="#onBankBrickSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+
+                <Button fx:id="youBananaSelectButton" managed="false" onAction="#onYouBananaSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="youWoodSelectButton" managed="false" onAction="#onYouWoodSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="youWheatSelectButton" managed="false" onAction="#onYouWheatSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="youOreSelectButton" managed="false" onAction="#onYouOreSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="youBrickSelectButton" managed="false" onAction="#onYouBrickSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+
+                <Button fx:id="bankTradeCancelButton" managed="false" onAction="#onBankTradeCancelClicked" opacity="0.0" prefHeight="52" prefWidth="152" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="bankTradeConfirmButton" managed="false" onAction="#onBankTradeConfirmClicked" opacity="0.0" prefHeight="52" prefWidth="152" styleClass="trade-click-zone" visible="false" />
+            </children>
+        </AnchorPane>
+                        </children>
+                    </Group>
+                </children>
+            </StackPane>
+        </children>
+    </StackPane>
+
+    <fx:include fx:id="buyExperimentOverlay" source="buy-experiment-card-overlay.fxml" />
+    <fx:include fx:id="rollDiceManualOverlay" source="roll-dice-manual-overlay.fxml" />
+    <fx:include fx:id="declareVictoryOverlay" source="declare-victory-overlay.fxml" />
 </StackPane>

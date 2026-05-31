@@ -279,6 +279,10 @@
     -fx-background-color: rgba(0, 0, 0, 0.35);
 }
 
+.trade-modal-root {
+    -fx-background-color: transparent;
+}
+
 .player-name-label {
     -fx-text-fill: #3f250d;
     -fx-font-size: 12px;
@@ -320,20 +324,7 @@
     -fx-background-color: transparent;
 }
 
-.popup-close-hitbox {
-    -fx-background-color: transparent;
-    -fx-border-color: transparent;
-    -fx-padding: 0;
-    -fx-cursor: hand;
-}
 
-.popup-close-hitbox:hover {
-    -fx-background-color: transparent;
-}
-
-.popup-close-hitbox:pressed {
-    -fx-background-color: transparent;
-}
 
 .settings-click-zone {
     -fx-background-color: transparent;
@@ -504,6 +495,270 @@
     -fx-font-weight: bold;
 }
 
+.trade-title-label {
+    -fx-text-fill: #f2f6ff;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-font-family: "Press Start 2P", "Minecraft", "Pixelify Sans", "Courier New";
+}
+
+.trade-subtitle-label {
+    -fx-text-fill: #d2ddff;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.trade-content-box {
+    -fx-background-color: rgba(5, 9, 22, 0.45);
+    -fx-background-radius: 10px;
+    -fx-padding: 14px;
+}
+
+.trade-section-label {
+    -fx-text-fill: #9ec0ff;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.trade-row {
+    -fx-alignment: center-left;
+    -fx-spacing: 8;
+}
+
+.trade-qty-label {
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-min-width: 32px;
+    -fx-alignment: center;
+}
+
+.trade-player-name {
+    -fx-text-fill: #f3f7ff;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.trade-click-zone {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.trade-click-zone:hover {
+    -fx-background-color: transparent;
+}
+
+.trade-click-zone:pressed {
+    -fx-background-color: transparent;
+}
+
+.trade-resource-card {
+    -fx-cursor: hand;
+}
+
+.trade-resource-card:hover {
+    -fx-opacity: 0.85;
+}
+
+.trade-success-label {
+    -fx-text-fill: #2d7a2d;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.trade-quantity-label {
+    -fx-text-fill: #2b1a0b;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.trade-small-button {
+    -fx-background-color: transparent;
+    -fx-border-color: #3b2108;
+    -fx-border-width: 1.5px;
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-padding: 0;
+}
+
+.trade-target-disabled {
+    -fx-opacity: 0.35;
+}
+
+.trade-target-card {
+    -fx-background-color: rgba(115, 78, 42, 0.55);
+    -fx-border-color: #4b2b12;
+    -fx-border-width: 2px;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 6px;
+    -fx-cursor: hand;
+    -fx-alignment: center;
+}
+
+.trade-target-card:hover {
+    -fx-background-color: rgba(150, 105, 58, 0.70);
+}
+
+.trade-target-name {
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.trade-target-selected {
+    -fx-border-color: #f4c542;
+    -fx-border-width: 3px;
+    -fx-effect: dropshadow(gaussian, #f4c542, 12, 0.65, 0, 0);
+}
+
+.trade-disabled {
+    -fx-opacity: 0.35;
+}
+
+.trade-selected {
+    -fx-effect: dropshadow(gaussian, rgba(114, 187, 255, 0.8), 8, 0.4, 0, 0);
+}
+
+.trade-checkmark {
+    -fx-text-fill: #1f1f1f;
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+}
+
+.trade-error-label {
+    -fx-text-fill: #b7261e;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.trade-info-message-label {
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.trade-offer-section-container {
+    -fx-alignment: center-left;
+}
+
+.trade-offer-resource-container {
+    -fx-spacing: 12px;
+    -fx-alignment: center-left;
+}
+
+.trade-offer-resource-row {
+    -fx-spacing: 12px;
+    -fx-alignment: center-left;
+}
+
+.trade-offer-resource-item {
+    -fx-alignment: center;
+    -fx-spacing: 4px;
+}
+
+.trade-offer-quantity-label {
+    -fx-text-fill: #2b1a0b;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.trade-offer-player-name {
+    -fx-text-fill: #2b1a0b;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.buy-experiment-resource-row {
+    -fx-spacing: 18px;
+    -fx-alignment: center;
+}
+
+.buy-experiment-resource-item {
+    -fx-spacing: 4px;
+    -fx-alignment: center;
+}
+
+.buy-experiment-resource-qty {
+    -fx-text-fill: #2b1a0b;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.buy-experiment-plus-label {
+    -fx-text-fill: #2b1a0b;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+}
+
+.buy-experiment-error-label {
+    -fx-text-fill: #b7261e;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.dice-manual-combo {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.dice-manual-error-label {
+    -fx-text-fill: #b7261e;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.dice-manual-image {
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 4, 0.4, 0, 2);
+}
+
+.victory-player-name {
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+}
+
+.victory-winner-name {
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 30px;
+    -fx-font-weight: bold;
+}
+
+.victory-points-label {
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+}
+
+.victory-winner-score-label {
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 36px;
+    -fx-font-weight: bold;
+}
+
+.victory-click-zone {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-cursor: hand;
+}
+
+.victory-click-zone:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
 /* ============================================================
    GAME REVISION STYLES
    ============================================================ */
@@ -615,4 +870,25 @@
     -fx-font-size: 10px;
     -fx-text-fill: #3b2108;
     -fx-wrap-text: true;
+}
+
+.popup-close-hitbox {
+    -fx-background-color: rgba(255, 255, 255, 0.01);
+    -fx-border-color: transparent;
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 14px;
+    -fx-background-radius: 14px;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.popup-close-hitbox:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.20);
+    -fx-border-color: rgba(255, 255, 255, 0.85);
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.45), 8, 0.2, 0, 0);
+}
+
+.popup-close-hitbox:pressed {
+    -fx-background-color: rgba(0, 0, 0, 0.22);
+    -fx-border-color: rgba(255, 255, 255, 0.60);
 }
