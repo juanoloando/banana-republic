@@ -10,6 +10,7 @@
 <?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.Rectangle?>
 
 <?import javafx.scene.Group?>
 <?import javafx.scene.text.Font?>
@@ -197,6 +198,40 @@
 
             <!-- X close button -->
             <Button layoutX="785" layoutY="13" onAction="#onCloseBuildPopup" opacity="0.0" prefHeight="62" prefWidth="62" styleClass="transparent-click-zone" />
+
+            <!-- LAB selection highlight (shown when user selects LAB) -->
+            <Rectangle fx:id="labHighlight" layoutX="18" layoutY="58"
+                       width="820" height="205"
+                       fill="rgba(255,215,0,0.18)" stroke="gold" strokeWidth="2.5"
+                       arcWidth="14" arcHeight="14"
+                       visible="false" mouseTransparent="true"/>
+
+            <!-- LAB click zone (covers entire LAB row) -->
+            <Button fx:id="selectLabButton" layoutX="18" layoutY="58"
+                    prefWidth="820" prefHeight="205"
+                    opacity="0.0" onAction="#onSelectLab"
+                    styleClass="transparent-click-zone"/>
+
+            <!-- OUTPOST selection highlight -->
+            <Rectangle fx:id="outpostHighlight" layoutX="18" layoutY="285"
+                       width="820" height="235"
+                       fill="rgba(255,215,0,0.18)" stroke="gold" strokeWidth="2.5"
+                       arcWidth="14" arcHeight="14"
+                       visible="false" mouseTransparent="true"/>
+
+            <!-- OUTPOST click zone (covers entire OUTPOST row) -->
+            <Button fx:id="selectOutpostButton" layoutX="18" layoutY="285"
+                    prefWidth="820" prefHeight="235"
+                    opacity="0.0" onAction="#onSelectOutpost"
+                    styleClass="transparent-click-zone"/>
+
+            <!-- Error label: shown 1.5 detik jika BUILD dipencet tanpa memilih icon -->
+            <Label fx:id="buildingSelectErrorLabel"
+                   layoutX="140" layoutY="600"
+                   prefWidth="575" prefHeight="34"
+                   text="Klik icon bangunan terlebih dahulu"
+                   style="-fx-text-fill: red; -fx-font-size: 13px; -fx-font-weight: bold; -fx-alignment: center;"
+                   visible="false" managed="false"/>
 
             <!-- BUILD button image -->
             <ImageView fitHeight="50" fitWidth="153" layoutX="351" layoutY="642" preserveRatio="false" smooth="true">

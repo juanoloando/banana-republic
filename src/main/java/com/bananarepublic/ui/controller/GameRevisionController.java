@@ -19,6 +19,7 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
+import javafx.fxml.FXMLLoader;
 import javafx.scene.layout.*;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
@@ -28,6 +29,7 @@ import model.player.Player;
 import model.resource.ResourceType;
 import persistence.SaveData;
 
+import java.io.IOException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -162,17 +164,31 @@ public class GameRevisionController {
     @FXML private DeclareVictoryOverlayController declareVictoryOverlayController;
 
     // Build popups
-    @FXML private Pane pipePopupPane;
-    @FXML private Pane buildingPopupPane;
+    @FXML private Pane      pipePopupPane;
+    @FXML private Pane      buildingPopupPane;
+    @FXML private javafx.scene.shape.Rectangle labHighlight;
+    @FXML private javafx.scene.shape.Rectangle outpostHighlight;
+    @FXML private Label     buildingSelectErrorLabel;
+    @FXML private Button    selectLabButton;
+    @FXML private Button    selectOutpostButton;
 
     // ── State ─────────────────────────────────────────────────────────
     private final HexRevisionRenderer hexRevisionRenderer = new HexRevisionRenderer();
     private final Map<ResourceType, Label> resourceBadgeLabels = new EnumMap<>(ResourceType.class);
 
+    // ── Z-order layers (added to boardPane after tiles) ───────────────
+    // Order from bottom: circleLayer → pipeLayer → buildingLayer (top)
+    private final Pane circleLayer   = new Pane();
+    private final Pane pipeLayer     = new Pane();
+    private final Pane buildingLayer = new Pane();
+
     // Build mode state
     private enum BuildType { NONE, OUTPOST, LAB, PIPE }
-    private BuildType pendingBuildType = BuildType.NONE;
-    private int pendingBuildId = -1;
+    private BuildType pendingBuildType    = BuildType.NONE;
+    private int       pendingBuildId      = -1;
+    // Selection in building popup: null = belum dipilih, "lab" atau "outpost"
+    private String    pendingBuildingSubType = null;
+    private Timeline  buildingSelectErrorTimeline;
     private final Map<Integer, HBox> playerCardBoxes = new HashMap<>();
     private int playerCount = 4;
     private int activePlayerIndex = 0;
@@ -180,6 +196,11 @@ public class GameRevisionController {
     private Font introFont;
     // Currently visible info panel ("log", "bank", or "" for none)
     private String activeInfoPanel = "";
+
+    // Local resource snapshot for overlay callbacks
+    private final Map<ResourceType, Integer> playerResourceCounts = new EnumMap<>(ResourceType.class);
+    // Current board — set after renderHexBoard(), used for build mode
+    private Board currentBoard;
 
     // ── Timer state ──────────────────────────────────────────────────
     private static final int DEFAULT_TURN_SECONDS = 90;
@@ -461,6 +482,7 @@ public class GameRevisionController {
         loadPlayerNames();
         setupPlayerCardBoxes();
         renderHexBoard();
+        setupBoardLayers();
         initInventory();
         initBankStock();
         initializeTradeState();
@@ -468,7 +490,16 @@ public class GameRevisionController {
         configureTradeModalSize(POPUP_ASSET_WIDTH, POPUP_ASSET_HEIGHT);
         updatePhaseDisplay(false);
         hidePopup();
-        startTurnTimer(DEFAULT_TURN_SECONDS);
+        setupRollDiceWarning();
+        // Restore frozen timer if returning from Load Game screen (cancel)
+        if (GameSession.hasPausedGameTimer()) {
+            int saved = GameSession.getPausedTimerSeconds();
+            activePlayerIndex = GameSession.getPausedActivePlayerIndex();
+            GameSession.clearPausedGameTimer();
+            startTurnTimer(saved);
+        } else {
+            startTurnTimer(DEFAULT_TURN_SECONDS);
+        }
     }
 
     private void setupTradeModalRoot() {
@@ -732,19 +763,19 @@ public class GameRevisionController {
             HexCoordinate robberPos =
                     new HexCoordinate(loadedSaveData.robberQ, loadedSaveData.robberR);
 
-            Board board = new StandardMapGenerator().generateBoard();
-            hexRevisionRenderer.render(boardPane, tiles, robberPos, board);
+            currentBoard = new StandardMapGenerator().generateBoard();
+            hexRevisionRenderer.render(boardPane, tiles, robberPos, currentBoard);
             return;
         }
 
-        Board board = new StandardMapGenerator().generateBoard();
-        HexCoordinate robberPos = board.getAllTiles().stream()
+        currentBoard = new StandardMapGenerator().generateBoard();
+        HexCoordinate robberPos = currentBoard.getAllTiles().stream()
                 .filter(t -> t.getTerrainType() == TerrainType.DESERT)
                 .map(HexTile::getCoordinate)
                 .findFirst()
                 .orElse(new HexCoordinate(0, 0));
 
-        hexRevisionRenderer.render(boardPane, board.getAllTiles(), robberPos, board);
+        hexRevisionRenderer.render(boardPane, currentBoard.getAllTiles(), robberPos, currentBoard);
     }
 
     private TerrainType parseTerrainType(String raw) {
@@ -764,7 +795,7 @@ public class GameRevisionController {
         for (int i = 0; i < rows.length; i++) {
             HBox box = new HBox(3);
             box.setLayoutX(310);
-            box.setLayoutY(44);
+            box.setLayoutY(5);
             box.setPrefHeight(44);
             box.setAlignment(Pos.CENTER_LEFT);
             rows[i].getChildren().add(box);
@@ -784,12 +815,22 @@ public class GameRevisionController {
             for (int i = 0; i < limit; i++) {
                 SaveData.PlayerData pd = saveData.players.get(i);
                 if (i == 0) {
-                    // Active player inventory (first player for now)
+                    // Active player inventory
                     refreshExperimentInventory(
                         pd.knightCardsInHand,
                         pd.progressCardsInHand,
                         pd.victoryPointCardsInHand
                     );
+                    // Load resources from save data
+                    if (pd.resources != null) {
+                        Map<ResourceType, Integer> resCounts = new EnumMap<>(ResourceType.class);
+                        pd.resources.forEach((key, val) -> {
+                            try { resCounts.put(ResourceType.valueOf(key), val); }
+                            catch (IllegalArgumentException ignored) {}
+                        });
+                        playerResourceCounts.putAll(resCounts);
+                        refreshResourceCards(resCounts);
+                    }
                 }
                 refreshPlayerStatusCards(i + 1,
                     pd.knightCardsInHand,
@@ -797,6 +838,8 @@ public class GameRevisionController {
                     pd.victoryPointCardsInHand
                 );
             }
+            // Populate stat labels (VP, Outpost, Lab, Knight, Pipe) for all players
+            populatePlayerStats(saveData);
         }
         // Resources start empty — engine will call refreshInventory() when distributed
     }
@@ -859,9 +902,9 @@ public class GameRevisionController {
         HBox box = playerCardBoxes.get(playerIndex);
         if (box == null) return;
         box.getChildren().clear();
-        addStatusCard(box, knightCards,   CardCategory.KNIGHT);
-        addStatusCard(box, progressCards, CardCategory.PROGRESS);
-        addStatusCard(box, vpCards,       CardCategory.VICTORY_POINT);
+        // Hanya tampilkan Knight dan Victory Point di stats profil pemain
+        addStatusCard(box, knightCards, CardCategory.KNIGHT);
+        addStatusCard(box, vpCards,     CardCategory.VICTORY_POINT);
     }
 
     private void addStatusCard(HBox box, int count, CardCategory category) {
@@ -873,8 +916,8 @@ public class GameRevisionController {
     /** Small card variant for player status rows. */
     private StackPane buildSmallCard(CardCategory category, int count) {
         ImageView img = new ImageView(loadCardImage(category));
-        img.setFitWidth(26);
-        img.setFitHeight(36);
+        img.setFitWidth(53);
+        img.setFitHeight(78);
         img.setPreserveRatio(false);
         img.setSmooth(true);
 
@@ -3805,6 +3848,9 @@ public class GameRevisionController {
             appendLog("Dice rolled: " + f1 + " + " + f2 + " = " + (f1 + f2) + ".");
         }
         // TODO: notify bridge layer -> GameEngine.rollDice(f1, f2)
+
+        // Setelah dadu dilempar, tampilkan lokasi yang bisa dibangun
+        tryAutoEnterBuildMode();
     }
 
     private void showDiceRollMethodBlockedInfo(boolean manualRequested) {
@@ -3857,15 +3903,159 @@ public class GameRevisionController {
         updateTurnDisplay(nextName);
         updatePhaseDisplay(false);
 
-        // Clear inventory for next player (engine will populate via refreshInventory)
-        inventoryResourceRow.getChildren().clear();
-        inventoryCardRow.getChildren().clear();
-        resourceBadgeLabels.clear();
+        // Load next player's resources from playerResourceStocks
+        refreshInventoryForPlayerIndex(activePlayerIndex);
 
         appendLog("─── Giliran " + nextName + " ───");
     }
 
+    /** Load and display inventory for a given player index from stored data. */
+    private void refreshInventoryForPlayerIndex(int idx) {
+        // Resources
+        if (idx < playerResourceStocks.size()) {
+            EnumMap<ResourceType, Integer> stock = playerResourceStocks.get(idx);
+            Map<ResourceType, Integer> nonZero = new EnumMap<>(ResourceType.class);
+            stock.forEach((k, v) -> { if (v > 0) nonZero.put(k, v); });
+            playerResourceCounts.clear();
+            playerResourceCounts.putAll(nonZero);
+            refreshResourceCards(nonZero);
+        } else {
+            inventoryResourceRow.getChildren().clear();
+            resourceBadgeLabels.clear();
+        }
+        // Experiment cards
+        SaveData saveData = GameSession.getLoadedSaveData();
+        if (saveData != null && saveData.players != null && idx < saveData.players.size()) {
+            SaveData.PlayerData pd = saveData.players.get(idx);
+            refreshExperimentInventory(
+                pd.knightCardsInHand,
+                pd.progressCardsInHand,
+                pd.victoryPointCardsInHand
+            );
+        } else {
+            inventoryCardRow.getChildren().clear();
+        }
+    }
+
+    /** Fill VP / Outpost / Lab / Knight / Pipe stat labels from SaveData for all players. */
+    private void populatePlayerStats(SaveData saveData) {
+        if (saveData == null || saveData.players == null) return;
+        Label[][] labels = {
+            {player1VpLabel, player1OutpostLabel, player1LabLabel, player1KnightLabel, player1PipeLabel},
+            {player2VpLabel, player2OutpostLabel, player2LabLabel, player2KnightLabel, player2PipeLabel},
+            {player3VpLabel, player3OutpostLabel, player3LabLabel, player3KnightLabel, player3PipeLabel},
+            {player4VpLabel, player4OutpostLabel, player4LabLabel, player4KnightLabel, player4PipeLabel},
+        };
+        int limit = Math.min(saveData.players.size(), 4);
+        for (int i = 0; i < limit; i++) {
+            SaveData.PlayerData pd = saveData.players.get(i);
+            int outposts = 0, labs = 0;
+            if (pd.buildings != null) {
+                for (SaveData.BuildingData b : pd.buildings) {
+                    if ("OUTPOST".equalsIgnoreCase(b.buildingType))    outposts++;
+                    else if ("LABORATORY".equalsIgnoreCase(b.buildingType)) labs++;
+                }
+            }
+            int vp = outposts + labs * 2
+                   + pd.victoryPointCardsInHand
+                   + (pd.name != null && pd.name.equals(saveData.longestRoadHolder) ? 2 : 0)
+                   + (pd.name != null && pd.name.equals(saveData.largestArmyHolder)  ? 2 : 0);
+            int pipes  = pd.pipePathIds != null ? pd.pipePathIds.size() : 0;
+            int knight = pd.knightCardsPlayed;
+
+            Label[] row = labels[i];
+            if (row[0] != null) row[0].setText(String.valueOf(vp));
+            if (row[1] != null) row[1].setText(String.valueOf(outposts));
+            if (row[2] != null) row[2].setText(String.valueOf(labs));
+            if (row[3] != null) row[3].setText(String.valueOf(knight));
+            if (row[4] != null) row[4].setText(String.valueOf(pipes));
+
+            // Store VP so declare-victory can check it
+            playerVictoryPointsCache[i] = vp;
+        }
+    }
+
+    // Cached VP per player (updated by populatePlayerStats)
+    private final int[] playerVictoryPointsCache = new int[4];
+    private static final int VICTORY_THRESHOLD = 10;
+
+    private int currentPlayerVP() {
+        if (activePlayerIndex < 0 || activePlayerIndex >= playerVictoryPointsCache.length) return 0;
+        return playerVictoryPointsCache[activePlayerIndex];
+    }
+
+    // ── Layer management ─────────────────────────────────────────────
+
+    /**
+     * Adds the 3 z-order layers on top of tile images.
+     * Order (bottom to top): circleLayer → pipeLayer → buildingLayer
+     * All layers are transparent with pickOnBounds=false so empty areas
+     * don't intercept mouse events destined for FXML elements.
+     */
+    private void setupBoardLayers() {
+        for (Pane layer : new Pane[]{circleLayer, pipeLayer, buildingLayer}) {
+            layer.setPickOnBounds(false);
+            layer.setBackground(javafx.scene.layout.Background.EMPTY);
+            layer.prefWidthProperty().bind(boardPane.prefWidthProperty());
+            layer.prefHeightProperty().bind(boardPane.prefHeightProperty());
+        }
+        // Pipes and buildings don't need to receive clicks
+        pipeLayer.setMouseTransparent(true);
+        buildingLayer.setMouseTransparent(true);
+        boardPane.getChildren().addAll(circleLayer, pipeLayer, buildingLayer);
+    }
+
     // ── Build mode ───────────────────────────────────────────────────
+
+    /**
+     * Called during initialize: jika save data menunjukkan fase TRADE_BUILD,
+     * tampilkan semua lokasi yang bisa dibangun berdasarkan data board.
+     * Ini untuk keperluan testing UI — bridge layer akan menggantikan ini
+     * dengan data validasi nyata dari GameEngine.
+     */
+    private void tryAutoEnterBuildMode() {
+        // Build mode dipanggil setelah dice roll — tidak perlu cek phase dari save data
+        // (phase sudah efektif TRADE_BUILD karena dadu baru saja dilempar)
+        if (currentBoard == null) return;
+
+        // Kumpulkan intersection valid untuk bangun outpost:
+        // adj >= 2: titik di mana 2 atau 3 tile bertemu (36 titik total)
+        // adj == 1 dikecualikan: sudut ekstrem board (hanya 1 tile, tidak valid)
+        Set<Integer> settlementIds = new HashSet<>();
+        Set<Integer> labIds        = new HashSet<>();
+        for (Intersection inter : currentBoard.getAllIntersections()) {
+            if (inter.getAdjacentTileCoords().size() < 2) continue;
+
+            if (inter.getBuilding().isEmpty()) {
+                settlementIds.add(inter.getId());
+            } else {
+                inter.getBuilding().ifPresent(b -> {
+                    // Jika sudah ada outpost milik pemain aktif → bisa upgrade ke lab
+                    String ownerName = b.getOwnerName();
+                    List<String> names = GameSession.getPlayerNames();
+                    if (!names.isEmpty() && ownerName.equals(names.get(activePlayerIndex))) {
+                        if ("Outpost".equalsIgnoreCase(b.getBuildingTypeName())
+                         || "OUTPOST".equalsIgnoreCase(b.getBuildingTypeName())) {
+                            labIds.add(inter.getId());
+                        }
+                    }
+                });
+            }
+        }
+
+        // Kumpulkan semua path kosong → bisa bangun pipe
+        Set<Integer> pipeIds = new HashSet<>();
+        for (BoardPath path : currentBoard.getAllPaths()) {
+            if (path.getPipe().isEmpty()) {
+                pipeIds.add(path.getId());
+            }
+        }
+
+        appendLog("[Build] settlement=" + settlementIds.size()
+                + " lab=" + labIds.size()
+                + " pipe=" + pipeIds.size());
+        enterBuildMode(settlementIds, labIds, pipeIds, currentBoard);
+    }
 
     /**
      * Shows red circles on all valid build locations for the current player.
@@ -3880,8 +4070,9 @@ public class GameRevisionController {
                                 Set<Integer> labIds,
                                 Set<Integer> pipeIds,
                                 Board board) {
+        // Circles go into circleLayer (bottom layer), always below pipes and buildings
         hexRevisionRenderer.renderBuildableLocations(
-            boardPane, settlementIds, labIds, pipeIds, board,
+            circleLayer, settlementIds, labIds, pipeIds, board,
             this::onIntersectionCircleClicked,
             this::onPathCircleClicked
         );
@@ -3889,37 +4080,61 @@ public class GameRevisionController {
 
     /** Removes all build circles and closes any open build popup. */
     public void exitBuildMode() {
-        hexRevisionRenderer.clearBuildableLocations(boardPane);
+        hexRevisionRenderer.clearBuildableLocations(circleLayer);
         hideBuildPopup();
         pendingBuildType = BuildType.NONE;
         pendingBuildId   = -1;
     }
 
     private void onIntersectionCircleClicked(int intersectionId, boolean isLab) {
-        pendingBuildType = isLab ? BuildType.LAB : BuildType.OUTPOST;
-        pendingBuildId   = intersectionId;
-        showBuildPopup(false); // building popup
+        pendingBuildType       = isLab ? BuildType.LAB : BuildType.OUTPOST;
+        pendingBuildId         = intersectionId;
+        pendingBuildingSubType = null;
+        showBuildPopup(false);
     }
 
     private void onPathCircleClicked(int pathId) {
         pendingBuildType = BuildType.PIPE;
         pendingBuildId   = pathId;
-        showBuildPopup(true); // pipe popup
+        showBuildPopup(true);
     }
 
     private void showBuildPopup(boolean isPipe) {
         hideBuildPopup();
+        resetBuildingSelection();
         Pane popup = isPipe ? pipePopupPane : buildingPopupPane;
         popup.setVisible(true);
         popup.setManaged(true);
         popup.toFront();
+        // Pre-highlight based on current build type
+        if (!isPipe) {
+            if (pendingBuildType == BuildType.LAB)    applyBuildingHighlight("lab");
+            else                                       applyBuildingHighlight("outpost");
+        }
     }
+
+    private void resetBuildingSelection() {
+        pendingBuildingSubType = null;
+        if (labHighlight     != null) labHighlight.setVisible(false);
+        if (outpostHighlight != null) outpostHighlight.setVisible(false);
+        if (buildingSelectErrorLabel != null) buildingSelectErrorLabel.setVisible(false);
+    }
+
+    private void applyBuildingHighlight(String type) {
+        pendingBuildingSubType = type;
+        if (labHighlight     != null) labHighlight.setVisible("lab".equals(type));
+        if (outpostHighlight != null) outpostHighlight.setVisible("outpost".equals(type));
+    }
+
+    @FXML private void onSelectLab()     { applyBuildingHighlight("lab"); }
+    @FXML private void onSelectOutpost() { applyBuildingHighlight("outpost"); }
 
     private void hideBuildPopup() {
         pipePopupPane.setVisible(false);
         pipePopupPane.setManaged(false);
         buildingPopupPane.setVisible(false);
         buildingPopupPane.setManaged(false);
+        resetBuildingSelection();
     }
 
     @FXML
@@ -3927,26 +4142,138 @@ public class GameRevisionController {
         hideBuildPopup();
         pendingBuildType = BuildType.NONE;
         pendingBuildId   = -1;
-        // Build circles remain — player can still choose to build something else
     }
 
     /**
      * Called when the BUILD button inside a popup is clicked.
-     * Delegates to the bridge layer via the appropriate GameEngine call.
-     * Override/extend this when connecting to the engine.
+     * For building popup: requires a selection (lab/outpost) first.
      */
     @FXML
     public void onBuildConfirmed() {
+        // Building popup: must select type first
+        if (pendingBuildType == BuildType.OUTPOST || pendingBuildType == BuildType.LAB) {
+            if (pendingBuildingSubType == null) {
+                showBuildingSelectError();
+                return;
+            }
+            pendingBuildType = "lab".equals(pendingBuildingSubType) ? BuildType.LAB : BuildType.OUTPOST;
+        }
+        performActualBuild();
+    }
+
+    private void showBuildingSelectError() {
+        if (buildingSelectErrorLabel == null) return;
+        if (arcadeFont != null) buildingSelectErrorLabel.setFont(
+            javafx.scene.text.Font.font(arcadeFont.getFamily(), 11));
+        buildingSelectErrorLabel.setVisible(true);
+        buildingSelectErrorLabel.setManaged(true);
+        if (buildingSelectErrorTimeline != null) buildingSelectErrorTimeline.stop();
+        buildingSelectErrorTimeline = new Timeline(
+            new KeyFrame(Duration.millis(1500), e -> {
+                buildingSelectErrorLabel.setVisible(false);
+                buildingSelectErrorLabel.setManaged(false);
+            })
+        );
+        buildingSelectErrorTimeline.play();
+    }
+
+    private void performActualBuild() {
+        String colorName = getPlayerColorName(activePlayerIndex);
         switch (pendingBuildType) {
-            case OUTPOST -> appendLog("Build outpost at intersection " + pendingBuildId + " — TODO: connect to GameEngine.buildSettlement()");
-            case LAB     -> appendLog("Build lab at intersection " + pendingBuildId     + " — TODO: connect to GameEngine.upgradeLaboratory()");
-            case PIPE    -> appendLog("Build pipe at path "        + pendingBuildId     + " — TODO: connect to GameEngine.buildPipe()");
-            default      -> {}
+            case OUTPOST -> {
+                renderBuildingOnMap(pendingBuildId, "pos", colorName);
+                appendLog("⛺ Outpost dibangun di intersection " + pendingBuildId);
+                // TODO: GameEngine.buildSettlement(pendingBuildId)
+            }
+            case LAB -> {
+                renderBuildingOnMap(pendingBuildId, "lab", colorName);
+                appendLog("🏛 Lab dibangun di intersection " + pendingBuildId);
+                // TODO: GameEngine.upgradeLaboratory(pendingBuildId)
+            }
+            case PIPE -> {
+                renderPipeOnMap(pendingBuildId, activePlayerIndex);
+                appendLog("🛣 Pipe dibangun di path " + pendingBuildId);
+                // TODO: GameEngine.buildPipe(pendingBuildId)
+            }
+            default -> {}
         }
         hideBuildPopup();
-        // Circles are cleared after a successful build by the engine callback;
-        // for now just exit build mode to prevent duplicate builds.
         exitBuildMode();
+        // Re-enter build mode so remaining valid spots still show
+        tryAutoEnterBuildMode();
+    }
+
+    // ── Building / pipe rendering ─────────────────────────────────────
+
+    private static final String BUILT_TAG = "built-structure";
+    private static final double PIPE_THICKNESS = 14.0;
+
+    private void renderBuildingOnMap(int intersectionId, String type, String colorName) {
+        if (currentBoard == null) return;
+        Map<Integer, HexRevisionRenderer.PixelPoint> intPos =
+            hexRevisionRenderer.computeIntersectionPositions(currentBoard);
+        HexRevisionRenderer.PixelPoint pos = intPos.get(intersectionId);
+        if (pos == null) return;
+
+        String path = "/com/bananarepublic/images/game_revision/" + type + "_" + colorName + ".png";
+        Image img = new Image(getClass().getResource(path).toExternalForm());
+        double scale = "pos".equals(type) ? 1.5 : 0.75; // pos 1.5x, lab 3/4
+        double w = img.getWidth()  * scale;
+        double h = img.getHeight() * scale;
+        ImageView iv = new ImageView(img);
+        iv.setFitWidth(w);
+        iv.setFitHeight(h);
+        iv.setSmooth(true);
+        iv.setLayoutX(pos.x() - w / 2.0);
+        iv.setLayoutY(pos.y() - h / 2.0);
+        iv.setUserData(BUILT_TAG);
+        buildingLayer.getChildren().add(iv); // top layer → always above pipes and circles
+    }
+
+    private void renderPipeOnMap(int pathId, int playerIdx) {
+        if (currentBoard == null) return;
+        var optPath = currentBoard.getPath(pathId);
+        if (optPath.isEmpty()) return;
+
+        Map<Integer, HexRevisionRenderer.PixelPoint> intPos =
+            hexRevisionRenderer.computeIntersectionPositions(currentBoard);
+        HexRevisionRenderer.PixelPoint a = intPos.get(optPath.get().getIntersectionIdA());
+        HexRevisionRenderer.PixelPoint b = intPos.get(optPath.get().getIntersectionIdB());
+        if (a == null || b == null) return;
+
+        double dx = b.x() - a.x(), dy = b.y() - a.y();
+        double len   = Math.sqrt(dx * dx + dy * dy);
+        double angle = Math.toDegrees(Math.atan2(dy, dx));
+        double cx = (a.x() + b.x()) / 2.0;
+        double cy = (a.y() + b.y()) / 2.0;
+
+        javafx.scene.shape.Rectangle pipe = new javafx.scene.shape.Rectangle(len, PIPE_THICKNESS);
+        pipe.setFill(getPlayerJavafxColor(playerIdx));
+        pipe.setArcWidth(PIPE_THICKNESS);
+        pipe.setArcHeight(PIPE_THICKNESS);
+        pipe.setLayoutX(cx - len / 2.0);
+        pipe.setLayoutY(cy - PIPE_THICKNESS / 2.0);
+        pipe.setRotate(angle);
+        pipe.setUserData(BUILT_TAG);
+        pipeLayer.getChildren().add(pipe); // middle layer → above circles, below buildings
+    }
+
+    private String getPlayerColorName(int idx) {
+        return switch (idx % 4) {
+            case 0 -> "red";
+            case 1 -> "blue";
+            case 2 -> "green";
+            default -> "yellow";
+        };
+    }
+
+    private javafx.scene.paint.Color getPlayerJavafxColor(int idx) {
+        return switch (idx % 4) {
+            case 0 -> javafx.scene.paint.Color.RED;
+            case 1 -> javafx.scene.paint.Color.DODGERBLUE;
+            case 2 -> javafx.scene.paint.Color.LIMEGREEN;
+            default -> javafx.scene.paint.Color.GOLD;
+        };
     }
 
     // ── Popup ────────────────────────────────────────────────────────
@@ -4276,8 +4603,54 @@ public class GameRevisionController {
         rollDiceRandom();
     }
 
+    // ── Phase gating ─────────────────────────────────────────────────
+
+    private Label rollDiceWarningLabel;
+    private Timeline rollDiceWarningTimeline;
+
+    /** Call once during initialize to create the warning overlay. */
+    private void setupRollDiceWarning() {
+        rollDiceWarningLabel = new Label("Roll Dadu Terlebih Dahulu!");
+        rollDiceWarningLabel.setStyle(
+            "-fx-text-fill: red;" +
+            "-fx-font-size: 22px;" +
+            "-fx-font-weight: bold;" +
+            "-fx-effect: dropshadow(gaussian, white, 4, 0.5, 0, 0);"
+        );
+        if (arcadeFont != null) {
+            rollDiceWarningLabel.setFont(Font.font(arcadeFont.getFamily(), 20));
+        }
+        rollDiceWarningLabel.setVisible(false);
+        rollDiceWarningLabel.setUserData("roll-dice-warning");
+        rollDiceWarningLabel.setMouseTransparent(true);
+        // Position center of board area
+        rollDiceWarningLabel.setLayoutX(300);
+        rollDiceWarningLabel.setLayoutY(500);
+        boardPane.getChildren().add(rollDiceWarningLabel);
+    }
+
+    private void showRollDiceWarning() {
+        if (rollDiceWarningLabel == null) return;
+        if (rollDiceWarningTimeline != null) rollDiceWarningTimeline.stop();
+        rollDiceWarningLabel.setVisible(true);
+        rollDiceWarningTimeline = new Timeline(
+            new KeyFrame(Duration.millis(1500), e -> rollDiceWarningLabel.setVisible(false))
+        );
+        rollDiceWarningTimeline.play();
+    }
+
+    /** Returns true if the action can proceed; shows warning and returns false otherwise. */
+    private boolean requireDiceRolled() {
+        if (!diceRolled) {
+            showRollDiceWarning();
+            return false;
+        }
+        return true;
+    }
+
     @FXML
     private void onTradeClicked() {
+        if (!requireDiceRolled()) return;
         System.out.println("[TradeUI] Trade button clicked");
         currentProposerIndex = Math.max(0, Math.min(activePlayerIndex, Math.max(playerResourceStocks.size() - 1, 0)));
         currentReceiverIndex = playerResourceStocks.size() > 1
@@ -4322,6 +4695,7 @@ public class GameRevisionController {
     }
     @FXML
     private void onBuyCardClicked()  {
+        if (!requireDiceRolled()) return;
         if (buyExperimentOverlayController == null) return;
         buyExperimentOverlayController.showOverlay();
     }
@@ -4333,6 +4707,7 @@ public class GameRevisionController {
 
     @FXML
     private void onBankClicked() {
+        // Bank info always viewable (no dice gate)
         if (!activeInfoPanel.equals("bank")) {
             buildBankCards();
         }
@@ -4340,7 +4715,24 @@ public class GameRevisionController {
     }
     @FXML
     private void onDeclareVictoryClicked() {
-        System.out.println("Declare Victory clicked");
+        if (!requireDiceRolled()) return;
+        int vp = currentPlayerVP();
+        if (vp < VICTORY_THRESHOLD) {
+            showRollDiceWarning(); // reuse label with custom text temporarily
+            if (rollDiceWarningLabel != null) {
+                rollDiceWarningLabel.setText("Butuh " + VICTORY_THRESHOLD + " VP! (kamu: " + vp + " VP)");
+                rollDiceWarningLabel.setVisible(true);
+                if (rollDiceWarningTimeline != null) rollDiceWarningTimeline.stop();
+                rollDiceWarningTimeline = new Timeline(
+                    new KeyFrame(Duration.millis(2000), e -> {
+                        rollDiceWarningLabel.setVisible(false);
+                        rollDiceWarningLabel.setText("Roll Dadu Terlebih Dahulu!");
+                    })
+                );
+                rollDiceWarningTimeline.play();
+            }
+            return;
+        }
         if (declareVictoryOverlayController == null) {
             showInformationPopup("Declare Victory screen is not available.", InformationCloseAction.RETURN_TO_GAME);
             return;
@@ -4349,6 +4741,7 @@ public class GameRevisionController {
     }
     @FXML
     public void onEndTurnClicked() {
+        if (!requireDiceRolled()) return;
         // If dice is still spinning, stop immediately and resolve
         if (diceTimeline != null && diceTimeline.getStatus() == Animation.Status.RUNNING) {
             diceTimeline.stop();
@@ -4364,6 +4757,9 @@ public class GameRevisionController {
 
     @FXML
     private void onLoadGameClicked() {
+        // Freeze timer so it can be restored when player cancels and returns
+        stopTimer();
+        GameSession.pauseGameTimer(remainingSeconds, activePlayerIndex);
         try {
             BananaRepublic.showLoadGame();
         } catch (Exception e) {

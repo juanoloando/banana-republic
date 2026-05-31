@@ -172,38 +172,38 @@ public class HexRevisionRenderer {
     // ──────────────────────────────────────────────────────────────
 
     private static final String BUILD_TAG = "build-indicator";
-    // Radius of the red clickable circle in board coordinates
-    private static final double BUILD_CIRCLE_RADIUS = 11.0;
+    private static final double BUILD_CIRCLE_RADIUS = 11.0;  // building circle radius
+    private static final double PIPE_CIRCLE_RADIUS  =  8.0;  // pipe circle radius (smaller)
 
     /**
-     * Renders clickable red circles at every valid build location.
-     *
-     * @param settlementIds  intersections where a new outpost can be built
-     * @param labIds         intersections where a lab upgrade is possible
-     * @param pipeIds        path IDs where a pipe can be built
-     * @param board          the Board object (needed for path endpoints & intersection coords)
-     * @param onIntersection called with (intersectionId, isLab) when a circle is clicked
-     * @param onPath         called with pathId when a pipe circle is clicked
+     * Renders build-mode circles:
+     *   RED    = can place outpost (settlement)
+     *   GOLD   = can upgrade to lab
+     *   BLUE   = can place pipe, positioned at midpoint between two adjacent intersection circles
      */
-    public void renderBuildableLocations(Pane boardPane,
+    /**
+     * Renders build-mode circles into a dedicated circlePane (separate from boardPane).
+     * circlePane must be layered below pipePane and buildingPane in the parent container.
+     */
+    public void renderBuildableLocations(Pane circlePane,
                                           Set<Integer> settlementIds,
                                           Set<Integer> labIds,
                                           Set<Integer> pipeIds,
                                           Board board,
                                           java.util.function.BiConsumer<Integer, Boolean> onIntersection,
                                           Consumer<Integer> onPath) {
-        clearBuildableLocations(boardPane);
+        clearBuildableLocations(circlePane);
         Map<Integer, PixelPoint> intPos = computeIntersectionPositions(board);
 
         for (int id : settlementIds) {
             PixelPoint p = intPos.get(id);
             if (p == null) continue;
-            addBuildCircle(boardPane, p, () -> onIntersection.accept(id, false));
+            addCircle(circlePane, p, BUILD_CIRCLE_RADIUS, Color.RED,       () -> onIntersection.accept(id, false));
         }
         for (int id : labIds) {
             PixelPoint p = intPos.get(id);
             if (p == null) continue;
-            addBuildCircle(boardPane, p, () -> onIntersection.accept(id, true));
+            addCircle(circlePane, p, BUILD_CIRCLE_RADIUS, Color.GOLD,      () -> onIntersection.accept(id, true));
         }
         for (int pathId : pipeIds) {
             board.getPath(pathId).ifPresent(path -> {
@@ -211,20 +211,20 @@ public class HexRevisionRenderer {
                 PixelPoint b = intPos.get(path.getIntersectionIdB());
                 if (a == null || b == null) return;
                 PixelPoint mid = new PixelPoint((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0);
-                addBuildCircle(boardPane, mid, () -> onPath.accept(pathId));
+                addCircle(circlePane, mid, PIPE_CIRCLE_RADIUS, Color.DODGERBLUE, () -> onPath.accept(pathId));
             });
         }
     }
 
-    /** Removes all build-mode circles from boardPane. */
-    public void clearBuildableLocations(Pane boardPane) {
-        boardPane.getChildren().removeIf(n -> BUILD_TAG.equals(n.getUserData()));
+    /** Removes all build-mode circles from circlePane. */
+    public void clearBuildableLocations(Pane circlePane) {
+        circlePane.getChildren().removeIf(n -> BUILD_TAG.equals(n.getUserData()));
     }
 
-    private void addBuildCircle(Pane boardPane, PixelPoint pos, Runnable onClick) {
-        Circle circle = new Circle(pos.x(), pos.y(), BUILD_CIRCLE_RADIUS);
-        circle.setFill(Color.RED);
-        circle.setOpacity(0.72);
+    private void addCircle(Pane boardPane, PixelPoint pos, double radius, Color fill, Runnable onClick) {
+        Circle circle = new Circle(pos.x(), pos.y(), radius);
+        circle.setFill(fill);
+        circle.setOpacity(0.80);
         circle.setStroke(Color.WHITE);
         circle.setStrokeWidth(1.5);
         circle.setCursor(Cursor.HAND);
@@ -233,23 +233,129 @@ public class HexRevisionRenderer {
         boardPane.getChildren().add(circle);
     }
 
+    // Half-spacing constants for vertex calculations
+    private static final double HEX_HALF_W      = HEX_SPACING_X / 2.0;        // 65
+    private static final double HEX_THIRD_H     = HEX_SPACING_Y / 3.0;        // ≈32.33
+    private static final double HEX_TWO_THIRD_H = HEX_SPACING_Y * 2.0 / 3.0; // ≈64.67
+
     /**
-     * Computes pixel positions for all intersections by averaging the pixel
-     * centres of their adjacent hex tiles.
+     * Returns the 6 vertex positions of a hex tile centered at p.
+     * Indices 0-5: Top, TR, BR, Bottom, BL, TL (clockwise).
+     */
+    private PixelPoint[] tileVertices(PixelPoint p) {
+        double cx = p.x(), cy = p.y();
+        return new PixelPoint[]{
+            new PixelPoint(cx,              cy - HEX_TWO_THIRD_H),
+            new PixelPoint(cx + HEX_HALF_W, cy - HEX_THIRD_H),
+            new PixelPoint(cx + HEX_HALF_W, cy + HEX_THIRD_H),
+            new PixelPoint(cx,              cy + HEX_TWO_THIRD_H),
+            new PixelPoint(cx - HEX_HALF_W, cy + HEX_THIRD_H),
+            new PixelPoint(cx - HEX_HALF_W, cy - HEX_THIRD_H),
+        };
+    }
+
+    private static double dist2(PixelPoint a, PixelPoint b) {
+        double dx = a.x() - b.x(), dy = a.y() - b.y();
+        return dx * dx + dy * dy;
+    }
+
+    /**
+     * Computes pixel positions for all intersections.
+     *
+     * - 3 adjacent tiles → centroid of the 3 tile centres (always correct for interior vertices)
+     * - 2 adjacent tiles → find the two vertices shared by both tiles, pick the one that points
+     *                       outward from the board centre (the true perimeter vertex)
+     * - 1 adjacent tile  → skipped (extreme-corner intersections; generally not valid build spots)
      */
     public Map<Integer, PixelPoint> computeIntersectionPositions(Board board) {
+        PixelPoint boardCenter = new PixelPoint(BOARD_ANCHOR_X, BOARD_ANCHOR_Y);
         Map<Integer, PixelPoint> result = new HashMap<>();
+
+        // Board tile coord set — needed for adj==1 virtual-tile calculation
+        Set<HexCoordinate> boardCoords = new HashSet<>();
+        for (var tile : board.getAllTiles()) boardCoords.add(tile.getCoordinate());
+
+        // ── adj==3 and adj==2 (single pass) ─────────────────────────────
+        Map<HexCoordinate, List<Integer>> oneTileGroups = new HashMap<>();
+
         for (Intersection intersection : board.getAllIntersections()) {
             List<HexCoordinate> adj = intersection.getAdjacentTileCoords();
-            if (adj.isEmpty()) continue;
-            double x = 0, y = 0;
-            for (HexCoordinate c : adj) {
-                PixelPoint p = toCenterPoint(c);
-                x += p.x();
-                y += p.y();
+            PixelPoint pos = null;
+
+            if (adj.size() == 3) {
+                double x = 0, y = 0;
+                for (HexCoordinate c : adj) { PixelPoint p = toCenterPoint(c); x += p.x(); y += p.y(); }
+                pos = new PixelPoint(x / 3.0, y / 3.0);
+
+            } else if (adj.size() == 2) {
+                PixelPoint[] va = tileVertices(toCenterPoint(adj.get(0)));
+                PixelPoint[] vb = tileVertices(toCenterPoint(adj.get(1)));
+                List<PixelPoint> shared = new ArrayList<>();
+                for (PixelPoint pa : va) {
+                    for (PixelPoint pb : vb) {
+                        if (dist2(pa, pb) < 1.0) { shared.add(pa); break; }
+                    }
+                }
+                if (shared.size() >= 2) {
+                    PixelPoint mid = new PixelPoint(
+                        (toCenterPoint(adj.get(0)).x() + toCenterPoint(adj.get(1)).x()) / 2.0,
+                        (toCenterPoint(adj.get(0)).y() + toCenterPoint(adj.get(1)).y()) / 2.0);
+                    double dx = mid.x() - boardCenter.x(), dy = mid.y() - boardCenter.y();
+                    double d0 = (shared.get(0).x()-mid.x())*dx + (shared.get(0).y()-mid.y())*dy;
+                    double d1 = (shared.get(1).x()-mid.x())*dx + (shared.get(1).y()-mid.y())*dy;
+                    pos = d0 > d1 ? shared.get(0) : shared.get(1);
+                } else if (shared.size() == 1) {
+                    pos = shared.get(0);
+                }
+                if (pos == null) {
+                    double x = 0, y = 0;
+                    for (HexCoordinate c : adj) { PixelPoint p = toCenterPoint(c); x += p.x(); y += p.y(); }
+                    pos = new PixelPoint(x / 2.0, y / 2.0);
+                }
+
+            } else if (adj.size() == 1) {
+                // Defer: handle after collecting all adj==1 per tile
+                oneTileGroups.computeIfAbsent(adj.get(0), k -> new ArrayList<>())
+                             .add(intersection.getId());
+                continue;
+            } else {
+                continue;
             }
-            result.put(intersection.getId(), new PixelPoint(x / adj.size(), y / adj.size()));
+            result.put(intersection.getId(), pos);
         }
+
+        // ── adj==1: assign each correct vertex via centroid with virtual tiles ───
+        // IntersectionPathBuilder iterates vertex pairs {0,1},{1,2},...,{5,0} in order.
+        // Lower intersection ID → earlier vertex pair index → assign in sorted order.
+        int[][] vpairs = {{0,1},{1,2},{2,3},{3,4},{4,5},{5,0}};
+        for (var entry : oneTileGroups.entrySet()) {
+            HexCoordinate tCoord  = entry.getKey();
+            List<Integer>  ids    = new ArrayList<>(entry.getValue());
+            Collections.sort(ids); // sort by ID: lower = earlier vertex pair
+
+            List<HexCoordinate> neighbors = tCoord.getNeighbors();
+            List<PixelPoint> positions = new ArrayList<>();
+
+            // Collect vertex positions where BOTH neighbors are outside the board
+            for (int[] pair : vpairs) {
+                HexCoordinate n1 = neighbors.get(pair[0]);
+                HexCoordinate n2 = neighbors.get(pair[1]);
+                if (!boardCoords.contains(n1) && !boardCoords.contains(n2)) {
+                    // Use centroid including virtual tiles (outside-board tiles still have coords)
+                    PixelPoint p  = toCenterPoint(tCoord);
+                    PixelPoint v1 = toCenterPoint(n1);
+                    PixelPoint v2 = toCenterPoint(n2);
+                    positions.add(new PixelPoint(
+                        (p.x() + v1.x() + v2.x()) / 3.0,
+                        (p.y() + v1.y() + v2.y()) / 3.0));
+                }
+            }
+
+            for (int i = 0; i < Math.min(ids.size(), positions.size()); i++) {
+                result.put(ids.get(i), positions.get(i));
+            }
+        }
+
         return result;
     }
 
@@ -275,5 +381,5 @@ public class HexRevisionRenderer {
         return new Image(BananaRepublic.class.getResource(path).toExternalForm());
     }
 
-    private record PixelPoint(double x, double y) {}
+    public record PixelPoint(double x, double y) {}
 }

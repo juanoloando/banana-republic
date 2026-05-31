@@ -37,4 +37,32 @@ public class GameSession {
     public static void clearLoadedSaveData() {
         loadedSaveData = null;
     }
+
+    // ── Timer pause/resume across scene switches ──────────────────────
+
+    /** -1 = no paused timer; >= 0 = seconds remaining when game was left */
+    private static int pausedTimerSeconds = -1;
+    private static int pausedActivePlayerIndex = 0;
+
+    public static void pauseGameTimer(int secondsRemaining, int activePlayerIndex) {
+        pausedTimerSeconds      = secondsRemaining;
+        pausedActivePlayerIndex = activePlayerIndex;
+    }
+
+    public static boolean hasPausedGameTimer() {
+        return pausedTimerSeconds >= 0;
+    }
+
+    public static int getPausedTimerSeconds() {
+        return pausedTimerSeconds;
+    }
+
+    public static int getPausedActivePlayerIndex() {
+        return pausedActivePlayerIndex;
+    }
+
+    public static void clearPausedGameTimer() {
+        pausedTimerSeconds      = -1;
+        pausedActivePlayerIndex = 0;
+    }
 }

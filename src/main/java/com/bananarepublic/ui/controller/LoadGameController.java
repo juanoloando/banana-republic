@@ -88,6 +88,7 @@ public class LoadGameController {
 
             GameSession.setPlayerNames(loadedNamesFromSave);
             GameSession.setLoadedSaveData(saveData);
+            GameSession.clearPausedGameTimer(); // new game load → no frozen timer
 
             System.out.println("Load game from: " + selectedFile.getAbsolutePath());
             System.out.println("Loaded players: " + loadedNamesFromSave);
@@ -104,7 +105,12 @@ public class LoadGameController {
 
     @FXML
     private void onCancelClicked() throws Exception {
-        BananaRepublic.showMainMenu();
+        // If a game is already running, return to it instead of main menu
+        if (GameSession.hasLoadedSaveData() || !GameSession.getPlayerNames().isEmpty()) {
+            BananaRepublic.showGame();
+        } else {
+            BananaRepublic.showMainMenu();
+        }
     }
 
     private void showWarning(String message) {
