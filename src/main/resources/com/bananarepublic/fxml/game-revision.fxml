@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.Rectangle?>
+
+<?import javafx.scene.Group?>
+<?import javafx.scene.text.Font?>
+
+<StackPane fx:id="rootPane" styleClass="responsive-root" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bananarepublic.ui.controller.GameRevisionController">
+
+    <AnchorPane fx:id="designPane" maxHeight="1080" maxWidth="1920" minHeight="1080" minWidth="1920" prefHeight="1080" prefWidth="1920">
+
+        <!-- ─── BACKGROUND ─────────────────────────────────────── -->
+        <ImageView fitHeight="1080" fitWidth="1920" preserveRatio="false" smooth="true">
+            <image>
+                <Image url="@../images/game_revision/Main%20Game.png" />
+            </image>
+        </ImageView>
+
+        <!-- ─── BOARD PANE (filled by HexRevisionRenderer) ──────── -->
+        <Pane fx:id="boardPane" layoutX="0" layoutY="0" prefHeight="1080" prefWidth="1340">
+         <children>
+      
+              <!-- Timer value only (in TIMER value box, x=1105..1270) -->
+              <Label fx:id="timerLabel" layoutX="1290.0" layoutY="31.0" prefHeight="50" prefWidth="73.0" styleClass="gr-timer-label" text="01:30" />
+      
+                    <!-- ═══════════════════════════════════════════════════════
+                   BOTTOM ACTION BUTTONS
+                         Pixel-located at y≈973..1075, x=[655,770,879,989,1099,1209]
+                         ═══════════════════════════════════════════════════════ -->
+      
+                    <Button fx:id="diceButton" layoutX="655.0" layoutY="971.0" onMouseClicked="#onDiceButtonMouseClicked" opacity="0.0" prefHeight="92.0" prefWidth="100.0" styleClass="transparent-click-zone" />
+         </children></Pane>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TOP BAR  (background blue-gray y=0..100)
+             Background pre-prints: "TURN" x≈270..320, "PHASE" x≈430..600,
+             "TIMER" x≈746..1100.  Labels go in the lighter value boxes.
+             ═══════════════════════════════════════════════════════ -->
+
+        <!-- Player name (in TURN value box, x=320..424) -->
+        <Label fx:id="turnLabel" layoutX="440.0" layoutY="28.0" prefHeight="50" prefWidth="112" styleClass="gr-turn-label" text="PLAYER 1" />
+
+        <!-- LOG / SAVE / LOAD buttons (x=1440..1920 brown area) -->
+        <Button fx:id="logButton" layoutX="1456.0" layoutY="18.0" onAction="#onLogClicked" opacity="0.0" prefHeight="67.0" prefWidth="132.0" styleClass="gr-top-bar-btn" text="LOG" textFill="TRANSPARENT" />
+
+        <Button fx:id="saveButton" layoutX="1611.0" layoutY="20.0" onAction="#onSaveClicked" opacity="0.0" prefHeight="67.0" prefWidth="132.0" styleClass="gr-top-bar-btn" text="SAVE" textFill="TRANSPARENT" />
+
+        <Button fx:id="loadButton" layoutX="1771.0" layoutY="20.0" onAction="#onLoadGameClicked" opacity="0.0" prefHeight="67.0" prefWidth="138.0" styleClass="gr-top-bar-btn" text="LOAD" textFill="TRANSPARENT" />
+
+        <!-- Players scroll pane (tan area y=170..405) -->
+        <ScrollPane fitToWidth="true" hbarPolicy="NEVER" layoutX="1383.0" layoutY="175.0" pannable="false" prefHeight="206.0" prefWidth="498.0" styleClass="players-scroll" vbarPolicy="AS_NEEDED">
+            <content>
+                <VBox spacing="4" style="-fx-padding: 2px;">
+
+                    <!-- Player 1 row -->
+                    <Pane fx:id="player1Row" prefHeight="93.0" prefWidth="478.0">
+                        <ImageView fx:id="player1ProfileImage" fitHeight="95.0" fitWidth="285.5" layoutX="10.0" layoutY="-1.0" preserveRatio="true" smooth="true" />
+                        <Label fx:id="player1NameLabel" layoutX="62.0" layoutY="14.0" prefHeight="18" prefWidth="190" styleClass="gr-player-name" text="Player 1">
+                     <font>
+                        <Font size="10.0" />
+                     </font></Label>
+                        <Label fx:id="player1VpLabel" layoutX="82.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player1OutpostLabel" layoutX="130.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player1LabLabel" layoutX="178.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player1KnightLabel" layoutX="224.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player1PipeLabel" layoutX="270.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                    </Pane>
+
+                       <!-- Player 2 row -->
+                    <Pane fx:id="player2Row" prefHeight="91.0" prefWidth="478.0">
+                        <ImageView fx:id="player2ProfileImage" fitHeight="95.0" fitWidth="285.5" layoutX="10.0" layoutY="-1.0" preserveRatio="true" smooth="true" />
+                        <Label fx:id="player2NameLabel" layoutX="62.0" layoutY="14.0" prefHeight="18" prefWidth="190" styleClass="gr-player-name" text="Player 2">
+                     <font>
+                        <Font size="10.0" />
+                     </font></Label>
+                        <Label fx:id="player2VpLabel" layoutX="82.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player2OutpostLabel" layoutX="130.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player2LabLabel" layoutX="178.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player2KnightLabel" layoutX="224.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player2PipeLabel" layoutX="270.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                    </Pane>
+
+                    <!-- Player 3 row -->
+                    <Pane fx:id="player3Row" prefHeight="90.0" prefWidth="478.0">
+                        <ImageView fx:id="player3ProfileImage" fitHeight="95.0" fitWidth="285.5" layoutX="10.0" layoutY="-1.0" preserveRatio="true" smooth="true" />
+                        <Label fx:id="player3NameLabel" layoutX="62.0" layoutY="14.0" prefHeight="18" prefWidth="190" styleClass="gr-player-name" text="Player 3">
+                     <font>
+                        <Font size="10.0" />
+                     </font></Label>
+                        <Label fx:id="player3VpLabel" layoutX="82.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player3OutpostLabel" layoutX="130.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player3LabLabel" layoutX="178.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player3KnightLabel" layoutX="224.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player3PipeLabel" layoutX="270.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                    </Pane>
+
+                    <!-- Player 4 row (hidden for 3-player game) -->
+                    <Pane fx:id="player4Row" prefHeight="90.0" prefWidth="478.0">
+                        <ImageView fx:id="player4ProfileImage" fitHeight="95.0" fitWidth="285.5" layoutX="10.0" layoutY="-1.0" preserveRatio="true" smooth="true" />
+                        <Label fx:id="player4NameLabel" layoutX="62.0" layoutY="14.0" prefHeight="18" prefWidth="190" styleClass="gr-player-name" text="Player 4">
+                     <font>
+                        <Font size="10.0" />
+                     </font></Label>
+                        <Label fx:id="player4VpLabel" layoutX="82.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player4OutpostLabel" layoutX="130.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player4LabLabel" layoutX="178.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player4KnightLabel" layoutX="224.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                        <Label fx:id="player4PipeLabel" layoutX="270.0" layoutY="46.0" prefWidth="26" styleClass="gr-stat-label" text="0" />
+                    </Pane>
+
+                </VBox>
+            </content>
+        </ScrollPane>
+
+                    <!-- Row 1: Resource cards (dynamically populated) -->
+        <HBox fx:id="inventoryResourceRow" layoutX="1386.0" layoutY="458" prefHeight="142" prefWidth="486.0" spacing="6" style="-fx-padding: 4px 6px;" />
+
+        <!-- Row 2: Experiment/special cards (dynamically populated) -->
+        <HBox fx:id="inventoryCardRow" layoutX="1386.0" layoutY="608" prefHeight="119.0" prefWidth="486.0" spacing="6" style="-fx-padding: 4px 6px;" />
+
+        <!-- Dynamic info panel: LOG / BANK (toggled by buttons) -->
+        <StackPane fx:id="infoPanelContainer" layoutX="1380.0" layoutY="745.0" prefHeight="279.0" prefWidth="505.0">
+
+            <!-- LOG panel -->
+            <Pane fx:id="logPanel" managed="false" prefHeight="280" prefWidth="506" visible="false">
+                <ImageView fitHeight="280" fitWidth="506" preserveRatio="false" smooth="true">
+                    <image><Image url="@../images/game_revision/panel_log.png" /></image>
+                </ImageView>
+                <ScrollPane fx:id="logScrollPane" fitToWidth="true" hbarPolicy="NEVER" layoutX="12" layoutY="44" pannable="false" prefHeight="228" prefWidth="482" styleClass="logbook-scroll" vbarPolicy="AS_NEEDED">
+                    <content>
+                        <VBox fx:id="logBox" spacing="2" style="-fx-padding: 4 6 4 6;" />
+                    </content>
+                </ScrollPane>
+            </Pane>
+
+            <!-- BANK panel -->
+            <Pane fx:id="bankPanel" managed="false" prefHeight="280" prefWidth="506" visible="false">
+                <ImageView fitHeight="280" fitWidth="506" preserveRatio="false" smooth="true">
+                    <image><Image url="@../images/game_revision/panel_bank.png" /></image>
+                </ImageView>
+                <HBox fx:id="bankCardRow" layoutX="12" layoutY="50" prefHeight="220" prefWidth="482" spacing="6" style="-fx-padding: 4 6 4 6;" />
+            </Pane>
+
+        </StackPane>
+        <Button layoutX="767.0" layoutY="969.0" onAction="#onTradeClicked" opacity="0.0" prefHeight="92.0" prefWidth="100" styleClass="transparent-click-zone" />
+        <Button layoutX="879.0" layoutY="970.0" onAction="#onBankClicked" opacity="0.0" prefHeight="92.0" prefWidth="100" styleClass="transparent-click-zone" />
+        <Button layoutX="989.0" layoutY="969.0" onAction="#onBuyCardClicked" opacity="0.0" prefHeight="92.0" prefWidth="100" styleClass="transparent-click-zone" />
+        <Button layoutX="1099.0" layoutY="968.0" onAction="#onDeclareVictoryClicked" opacity="0.0" prefHeight="92.0" prefWidth="100" styleClass="transparent-click-zone" />
+        <Button layoutX="1210.0" layoutY="968.0" onAction="#onEndTurnClicked" opacity="0.0" prefHeight="92.0" prefWidth="100" styleClass="transparent-click-zone" />
+
+        <!-- ═══════════════════════════════════════════════════════
+             POPUP OVERLAY
+             ═══════════════════════════════════════════════════════ -->
+        
+
+        <!-- ═══════════════════════════════════════════════════════
+             BUILD POPUPS  (centered: pipe 855×553, building 855×702)
+             Design center: 1920/2=960, 1080/2=540
+             ═══════════════════════════════════════════════════════ -->
+
+        <!-- PIPE popup — shown when player clicks a pipe build circle -->
+        <Pane fx:id="pipePopupPane" layoutX="533" layoutY="264" managed="false" prefHeight="553" prefWidth="855" visible="false">
+
+            <!-- Background image -->
+            <ImageView fitHeight="553" fitWidth="855" preserveRatio="false" smooth="true">
+                <image><Image url="@../images/game_revision/popup_pipe.png" /></image>
+            </ImageView>
+
+            <!-- X close button (opacity 0 — icon already on image, top-right ~x=785,y=13) -->
+            <Button layoutX="785" layoutY="13" onAction="#onCloseBuildPopup" opacity="0.0" prefHeight="62" prefWidth="62" styleClass="transparent-click-zone" />
+
+            <!-- BUILD button image -->
+            <ImageView fitHeight="50" fitWidth="153" layoutX="351" layoutY="493" preserveRatio="false" smooth="true">
+                <image><Image url="@../images/game_revision/btn_build.png" /></image>
+            </ImageView>
+            <!-- BUILD button hitbox -->
+            <Button layoutX="351" layoutY="493" onAction="#onBuildConfirmed" opacity="0.0" prefHeight="50" prefWidth="153" styleClass="transparent-click-zone" />
+
+        </Pane>
+
+        <!-- BUILDING popup — shown when player clicks an intersection build circle -->
+        <Pane fx:id="buildingPopupPane" layoutX="533" layoutY="189" managed="false" prefHeight="702" prefWidth="855" visible="false">
+
+            <!-- Background image -->
+            <ImageView fitHeight="702" fitWidth="855" preserveRatio="false" smooth="true">
+                <image><Image url="@../images/game_revision/popup_building.png" /></image>
+            </ImageView>
+
+            <!-- X close button -->
+            <Button layoutX="785" layoutY="13" onAction="#onCloseBuildPopup" opacity="0.0" prefHeight="62" prefWidth="62" styleClass="transparent-click-zone" />
+
+            <!-- LAB selection highlight (shown when user selects LAB) -->
+            <Rectangle fx:id="labHighlight" layoutX="18" layoutY="58"
+                       width="820" height="205"
+                       fill="rgba(255,215,0,0.18)" stroke="gold" strokeWidth="2.5"
+                       arcWidth="14" arcHeight="14"
+                       visible="false" mouseTransparent="true"/>
+
+            <!-- LAB click zone (covers entire LAB row) -->
+            <Button fx:id="selectLabButton" layoutX="18" layoutY="58"
+                    prefWidth="820" prefHeight="205"
+                    opacity="0.0" onAction="#onSelectLab"
+                    styleClass="transparent-click-zone"/>
+
+            <!-- OUTPOST selection highlight -->
+            <Rectangle fx:id="outpostHighlight" layoutX="18" layoutY="285"
+                       width="820" height="235"
+                       fill="rgba(255,215,0,0.18)" stroke="gold" strokeWidth="2.5"
+                       arcWidth="14" arcHeight="14"
+                       visible="false" mouseTransparent="true"/>
+
+            <!-- OUTPOST click zone (covers entire OUTPOST row) -->
+            <Button fx:id="selectOutpostButton" layoutX="18" layoutY="285"
+                    prefWidth="820" prefHeight="235"
+                    opacity="0.0" onAction="#onSelectOutpost"
+                    styleClass="transparent-click-zone"/>
+
+            <!-- Error label: shown 1.5 detik jika BUILD dipencet tanpa memilih icon -->
+            <Label fx:id="buildingSelectErrorLabel"
+                   layoutX="140" layoutY="600"
+                   prefWidth="575" prefHeight="34"
+                   text="Klik icon bangunan terlebih dahulu"
+                   style="-fx-text-fill: red; -fx-font-size: 13px; -fx-font-weight: bold; -fx-alignment: center;"
+                   visible="false" managed="false"/>
+
+            <!-- BUILD button image -->
+            <ImageView fitHeight="50" fitWidth="153" layoutX="351" layoutY="642" preserveRatio="false" smooth="true">
+                <image><Image url="@../images/game_revision/btn_build.png" /></image>
+            </ImageView>
+            <!-- BUILD button hitbox -->
+            <Button layoutX="351" layoutY="642" onAction="#onBuildConfirmed" opacity="0.0" prefHeight="50" prefWidth="153" styleClass="transparent-click-zone" />
+
+        </Pane>
+
+    </AnchorPane>
+    <StackPane fx:id="tradeOverlayRoot" managed="false" maxHeight="Infinity" maxWidth="Infinity" pickOnBounds="true" styleClass="trade-modal-root" visible="false">
+        <children>
+            <Pane fx:id="popupOverlay" managed="false" maxHeight="Infinity" maxWidth="Infinity" prefHeight="1080" prefWidth="1920" styleClass="popup-overlay" visible="false" />
+            <StackPane fx:id="tradeOverlayCenterLayer" alignment="CENTER" pickOnBounds="false">
+                <children>
+                    <Group fx:id="tradeModalScaleGroup" StackPane.alignment="CENTER">
+                        <children>
+<AnchorPane fx:id="tradePopupContainer" translateX="0.0" translateY="0.0" managed="false" prefHeight="753" prefWidth="1048" visible="false">
+            <children>
+                <ImageView fx:id="popupImageView" fitHeight="753" fitWidth="1048" managed="false" mouseTransparent="true" preserveRatio="false" smooth="true" visible="false" />
+                <AnchorPane fx:id="tradeUiPane" managed="false" prefHeight="753" prefWidth="1048" visible="false" />
+                <Label fx:id="tradeErrorLabel" managed="false" prefHeight="28" prefWidth="880" styleClass="trade-error-label" visible="false" />
+                <Label fx:id="playerTradeMessageLabel" managed="false" prefHeight="30" prefWidth="610" styleClass="trade-error-label" visible="false" />
+                <HBox fx:id="tradeActionButtonsBox" alignment="CENTER" managed="false" prefHeight="44" prefWidth="532" spacing="18" visible="false" />
+                <Button fx:id="popupCloseButton" managed="false" onAction="#onClosePopupClicked" opacity="0.0" prefHeight="60" prefWidth="60" styleClass="transparent-click-zone" visible="false" />
+                <Button fx:id="tradeChoiceBankButton" managed="false" onAction="#onTradeChoiceBankClicked" opacity="0.0" prefHeight="74" prefWidth="175" styleClass="transparent-click-zone" visible="false" />
+                <Button fx:id="tradeChoicePlayerButton" managed="false" onAction="#onTradeChoicePlayerClicked" opacity="0.0" prefHeight="75" prefWidth="175" styleClass="transparent-click-zone" visible="false" />
+                <Button fx:id="tradeChoiceHarborButton" managed="false" onAction="#onTradeChoiceHarborClicked" opacity="0.0" prefHeight="73" prefWidth="173" styleClass="transparent-click-zone" visible="false" />
+
+                <!-- Bank Trade specific controls -->
+                <Label fx:id="bankTradeMessageLabel" alignment="CENTER" managed="false" prefHeight="24" prefWidth="760" visible="false" />
+
+                <Label fx:id="bankBananaQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="bankWoodQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="bankWheatQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="bankOreQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="bankBrickQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+
+                <Label fx:id="youBananaQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="youWoodQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="youWheatQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="youOreQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+                <Label fx:id="youBrickQtyLabel" alignment="CENTER" managed="false" prefHeight="18" prefWidth="40" style="-fx-text-fill: #3f2d17; -fx-font-weight: bold;" visible="false" />
+
+                <Label fx:id="bankBananaCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="bankWoodCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="bankWheatCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="bankOreCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="bankBrickCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+
+                <Label fx:id="youBananaCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="youWoodCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="youWheatCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="youOreCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+                <Label fx:id="youBrickCheck" alignment="CENTER" managed="false" prefHeight="24" prefWidth="24" style="-fx-border-color: #7a4a23; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-color: rgba(122,74,35,0.12); -fx-background-radius: 999;" visible="false" />
+
+                <Button fx:id="bankBananaSelectButton" managed="false" onAction="#onBankBananaSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="bankWoodSelectButton" managed="false" onAction="#onBankWoodSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="bankWheatSelectButton" managed="false" onAction="#onBankWheatSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="bankOreSelectButton" managed="false" onAction="#onBankOreSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="bankBrickSelectButton" managed="false" onAction="#onBankBrickSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+
+                <Button fx:id="youBananaSelectButton" managed="false" onAction="#onYouBananaSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="youWoodSelectButton" managed="false" onAction="#onYouWoodSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="youWheatSelectButton" managed="false" onAction="#onYouWheatSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="youOreSelectButton" managed="false" onAction="#onYouOreSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="youBrickSelectButton" managed="false" onAction="#onYouBrickSelected" opacity="0.0" prefHeight="34" prefWidth="34" styleClass="trade-click-zone" visible="false" />
+
+                <Button fx:id="bankTradeCancelButton" managed="false" onAction="#onBankTradeCancelClicked" opacity="0.0" prefHeight="52" prefWidth="152" styleClass="trade-click-zone" visible="false" />
+                <Button fx:id="bankTradeConfirmButton" managed="false" onAction="#onBankTradeConfirmClicked" opacity="0.0" prefHeight="52" prefWidth="152" styleClass="trade-click-zone" visible="false" />
+            </children>
+        </AnchorPane>
+                        </children>
+                    </Group>
+                </children>
+            </StackPane>
+        </children>
+    </StackPane>
+
+    <fx:include fx:id="buyExperimentOverlay" source="buy-experiment-card-overlay.fxml" />
+    <fx:include fx:id="rollDiceManualOverlay" source="roll-dice-manual-overlay.fxml" />
+    <fx:include fx:id="declareVictoryOverlay" source="declare-victory-overlay.fxml" />
+</StackPane>

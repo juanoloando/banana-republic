@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.Group?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.StackPane?>
+
+<StackPane fx:id="overlayRoot" managed="false" maxHeight="Infinity" maxWidth="Infinity" pickOnBounds="true"
+           styleClass="trade-modal-root" visible="false"
+           xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="com.bananarepublic.ui.controller.BuyExperimentCardOverlayController">
+    <children>
+        <Pane fx:id="overlayBackdrop" maxHeight="Infinity" maxWidth="Infinity" prefHeight="1080.0" prefWidth="1920.0"
+              styleClass="popup-overlay"/>
+        <StackPane fx:id="centerLayer" alignment="CENTER" pickOnBounds="false">
+            <children>
+                <Group fx:id="modalScaleGroup" StackPane.alignment="CENTER">
+                    <children>
+                        <AnchorPane fx:id="popupContainer" prefHeight="1136.0" prefWidth="887.0">
+                            <children>
+                                <ImageView fx:id="popupImageView" fitHeight="1136.0" fitWidth="887.0" mouseTransparent="true"
+                                           preserveRatio="false" smooth="true">
+                                    <image>
+                                        <Image url="@../images/buycard/Buy%20Experiment%20Card.png"/>
+                                    </image>
+                                </ImageView>
+
+                                <HBox fx:id="requiredResourceRow" alignment="CENTER" layoutX="150.0" layoutY="410.0"
+                                      prefHeight="190.0" prefWidth="590.0" styleClass="buy-experiment-resource-row"/>
+
+                                <HBox fx:id="yourResourceRow" alignment="CENTER" layoutX="185.0" layoutY="692.0"
+                                      prefHeight="190.0" prefWidth="520.0" styleClass="buy-experiment-resource-row"/>
+
+                                <Label fx:id="buyExperimentMessageLabel" alignment="CENTER" layoutX="120.0" layoutY="962.0"
+                                       managed="false" prefHeight="30.0" prefWidth="640.0"
+                                       styleClass="buy-experiment-error-label" visible="false"/>
+
+                                <Button fx:id="buyExperimentCancelButton" onAction="#onBuyExperimentCancelClicked" opacity="0.0"
+                                        prefHeight="52.0" prefWidth="199.0" styleClass="trade-click-zone"/>
+                                <Button fx:id="buyExperimentBuyButton" onAction="#onBuyExperimentCardClicked" opacity="0.0"
+                                        prefHeight="52.0" prefWidth="199.0" styleClass="trade-click-zone"/>
+                            </children>
+                        </AnchorPane>
+                    </children>
+                </Group>
+            </children>
+        </StackPane>
+    </children>
+</StackPane>

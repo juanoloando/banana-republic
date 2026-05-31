@@ -34,3 +34,9 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+hs_err_pid*.log
+replay_pid*.log
+# JavaFX SDK (downloaded by makefile, do not commit)
+javafx-sdk*/
+javafx-sdk.zip

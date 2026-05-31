@@ -1,0 +1,894 @@
+.screen {
+    -fx-background-color: #f8e7a2;
+    -fx-padding: 32px;
+}
+
+/* Pixel-font stack (akan pakai yang tersedia di sistem). */
+.root {
+    -fx-font-family: "Press Start 2P", "Minecraft", "Pixelify Sans", "Courier New";
+}
+
+.title {
+    -fx-font-size: 48px;
+    -fx-font-weight: bold;
+}
+
+.section-title {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+}
+
+.primary-button {
+    -fx-background-color: #f6b800;
+    -fx-text-fill: #2b2100;
+    -fx-font-weight: bold;
+    -fx-padding: 10px 20px;
+    -fx-background-radius: 12px;
+}
+
+.secondary-button {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #2b2100;
+    -fx-padding: 10px 20px;
+    -fx-background-radius: 12px;
+}
+
+.game-screen {
+    -fx-background-color: #bdefff;
+}
+
+.board-pane {
+    -fx-background-color: #9edc88;
+}
+
+.side-panel {
+    -fx-background-color: #fff7d6;
+    -fx-padding: 20px;
+    -fx-pref-width: 260px;
+}
+
+.bottom-bar {
+    -fx-background-color: #fff0b8;
+    -fx-padding: 16px;
+}
+
+.dialog-root {
+    -fx-background-color: #fff7d6;
+    -fx-padding: 24px;
+}
+
+.dialog-title {
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+}
+
+.muted-text {
+    -fx-text-fill: #666666;
+}
+
+.main-menu-root {
+    -fx-background-color: #0179cc;
+    -fx-background-image: url("../images/mainmenu/main_menu_bg.png");
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center center;
+    -fx-background-size: 100% 100%;
+}
+
+.image-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.image-button:hover {
+    -fx-opacity: 0.88;
+    -fx-scale-x: 1.03;
+    -fx-scale-y: 1.03;
+}
+
+.image-button:pressed {
+    -fx-opacity: 0.75;
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
+}
+
+.image-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.image-button:hover {
+    -fx-opacity: 0.88;
+    -fx-scale-x: 1.03;
+    -fx-scale-y: 1.03;
+}
+
+.image-button:pressed {
+    -fx-opacity: 0.75;
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
+}
+
+.transparent-input {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-text-fill: white;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-prompt-text-fill: rgba(255, 255, 255, 0.6);
+}
+
+.responsive-root {
+    -fx-background-color: black;
+}
+
+.transparent-click-zone {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.transparent-click-zone:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
+.transparent-click-zone:pressed {
+    -fx-background-color: rgba(0, 0, 0, 0.18);
+}
+
+.player-count-toggle {
+    -fx-background-color: rgba(72, 38, 13, 0.55);
+    -fx-border-color: #d59b46;
+    -fx-border-width: 2px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-text-fill: white;
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.player-count-toggle:selected {
+    -fx-background-color: #f4b73c;
+    -fx-text-fill: #3b2108;
+}
+
+.wood-input {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-text-fill: white;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-padding: 0 10px 0 10px;
+    -fx-prompt-text-fill: rgba(255, 255, 255, 0.55);
+}
+
+.wood-input:disabled {
+    -fx-opacity: 0.45;
+}
+
+.plugin-file-label {
+    -fx-text-fill: #f7e8bf;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-alignment: center-left;
+    -fx-padding: -6 14px 0 132px;
+    -fx-text-overrun: ellipsis;
+}
+
+.load-file-label {
+    -fx-text-fill: #f7e8bf;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-alignment: center-left;
+    -fx-padding: -8 20px 0 28px;
+    -fx-text-overrun: ellipsis;
+}
+
+.responsive-root {
+    -fx-background-color: black;
+}
+
+.transparent-click-zone {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.transparent-click-zone:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
+.transparent-click-zone:pressed {
+    -fx-background-color: rgba(0, 0, 0, 0.18);
+}
+
+.timer-label {
+    -fx-text-fill: white;
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-alignment: center-left;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 2, 0.3, 1, 1);
+}
+
+.logbook-scroll {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.logbook-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.logbook-scroll .scroll-bar:horizontal {
+    -fx-opacity: 0;
+    -fx-max-height: 0;
+    -fx-pref-height: 0;
+}
+
+.logbook-scroll .scroll-bar:vertical {
+    -fx-background-color: transparent;
+    -fx-padding: 2 2 2 2;
+}
+
+.logbook-scroll .scroll-bar:vertical .thumb {
+    -fx-background-color: rgba(56, 38, 20, 0.45);
+    -fx-background-radius: 12px;
+}
+
+.logbook-scroll .scroll-bar:vertical .track {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-background-radius: 12px;
+}
+
+.logbook-content {
+    -fx-padding: 20 14 14 14;
+}
+
+.logbook-entry {
+    -fx-text-fill: #5b3513;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-padding: 2 0 2 0;
+    -fx-line-spacing: 2px;
+}
+
+.disabled-player-overlay {
+    -fx-background-color: rgba(0, 0, 0, 0.55);
+    -fx-background-insets: 0;
+    -fx-background-radius: 16px;
+}
+
+.popup-root {
+    -fx-background-color: transparent;
+}
+
+.popup-close-button {
+    -fx-background-color: rgba(80, 40, 12, 0.85);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.popup-overlay {
+    -fx-background-color: rgba(0, 0, 0, 0.35);
+}
+
+.trade-modal-root {
+    -fx-background-color: transparent;
+}
+
+.player-name-label {
+    -fx-text-fill: #3f250d;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+    -fx-translate-y: 0;
+    -fx-padding: 0;
+    -fx-label-padding: 0;
+    -fx-font-family: "Press Start 2P", "Minecraft", "Pixelify Sans", "Courier New";
+}
+
+.player-stat-label {
+    -fx-text-fill: #4a2d12;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-alignment: center-left;
+    -fx-padding: 0;
+    -fx-label-padding: 0;
+}
+
+.player-click-zone {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-background-insets: 0;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.player-click-zone:hover {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
+
+.player-click-zone:pressed {
+    -fx-background-color: transparent;
+}
+
+
+
+.settings-click-zone {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+    -fx-background-radius: 12px;
+}
+
+.settings-click-zone:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.02);
+    -fx-effect: dropshadow(gaussian, rgba(255, 248, 202, 0.35), 8, 0.2, 0, 0);
+}
+
+.settings-click-zone:pressed {
+    -fx-background-color: rgba(0, 0, 0, 0.08);
+}
+
+.turn-phase-inline-label {
+    -fx-text-fill: #f4f7ff;
+    -fx-font-size: 40px;
+    -fx-font-weight: bold;
+    -fx-font-family: "Press Start 2P", "Minecraft", "Pixelify Sans", "Courier New";
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 2, 0.3, 1, 1);
+}
+
+.save-load-click-zone {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.save-load-click-zone:hover {
+    -fx-background-color: transparent;
+    -fx-opacity: 0.95;
+}
+
+.save-load-click-zone:pressed {
+    -fx-background-color: transparent;
+    -fx-opacity: 0.88;
+}
+
+.players-scroll {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.players-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.players-scroll .scroll-bar:vertical {
+    -fx-opacity: 0;
+    -fx-max-width: 0;
+    -fx-pref-width: 0;
+}
+
+.players-scroll .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-padding: 2 2 2 2;
+}
+
+.players-scroll .scroll-bar:horizontal .thumb {
+    -fx-background-color: rgba(56, 38, 20, 0.45);
+    -fx-background-radius: 12px;
+}
+
+.players-scroll .scroll-bar:horizontal .track {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-background-radius: 12px;
+}
+
+.experiment-card-slot {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 3, 0.2, 1, 1);
+}
+
+.experiment-card-row {
+    -fx-alignment: center-left;
+}
+
+.inventory-dialog-root {
+    -fx-background-color: linear-gradient(to bottom, #0b1430, #0a1022);
+    -fx-padding: 20px;
+    -fx-border-color: rgba(95, 152, 255, 0.5);
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+}
+
+.inventory-title {
+    -fx-text-fill: #f4f8ff;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-font-family: "Press Start 2P", "Minecraft", "Pixelify Sans", "Courier New";
+}
+
+.inventory-subtitle {
+    -fx-text-fill: #8aa6dc;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.inventory-player-name {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 21px;
+    -fx-font-weight: bold;
+}
+
+.inventory-header {
+    -fx-padding: 8 0 6 0;
+}
+
+.inventory-scroll {
+    -fx-background-color: rgba(255, 255, 255, 0.04);
+    -fx-border-color: rgba(111, 146, 226, 0.35);
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+}
+
+.inventory-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.inventory-scroll .scroll-bar:horizontal {
+    -fx-opacity: 0;
+    -fx-max-height: 0;
+    -fx-pref-height: 0;
+}
+
+.inventory-scroll .scroll-bar:vertical .thumb {
+    -fx-background-color: rgba(128, 166, 255, 0.5);
+    -fx-background-radius: 10px;
+}
+
+.inventory-scroll .scroll-bar:vertical .track {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+    -fx-background-radius: 10px;
+}
+
+.inventory-items-box {
+    -fx-padding: 12px;
+}
+
+.inventory-section-title {
+    -fx-text-fill: #9fc0ff;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 8 0 4 0;
+}
+
+.inventory-item-row {
+    -fx-alignment: center-left;
+    -fx-padding: 8 10 8 10;
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-background-radius: 8px;
+}
+
+.inventory-item-name {
+    -fx-text-fill: #e8f0ff;
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+}
+
+.inventory-item-qty {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+}
+
+.trade-title-label {
+    -fx-text-fill: #f2f6ff;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-font-family: "Press Start 2P", "Minecraft", "Pixelify Sans", "Courier New";
+}
+
+.trade-subtitle-label {
+    -fx-text-fill: #d2ddff;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.trade-content-box {
+    -fx-background-color: rgba(5, 9, 22, 0.45);
+    -fx-background-radius: 10px;
+    -fx-padding: 14px;
+}
+
+.trade-section-label {
+    -fx-text-fill: #9ec0ff;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.trade-row {
+    -fx-alignment: center-left;
+    -fx-spacing: 8;
+}
+
+.trade-qty-label {
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-min-width: 32px;
+    -fx-alignment: center;
+}
+
+.trade-player-name {
+    -fx-text-fill: #f3f7ff;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.trade-click-zone {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.trade-click-zone:hover {
+    -fx-background-color: transparent;
+}
+
+.trade-click-zone:pressed {
+    -fx-background-color: transparent;
+}
+
+.trade-resource-card {
+    -fx-cursor: hand;
+}
+
+.trade-resource-card:hover {
+    -fx-opacity: 0.85;
+}
+
+.trade-success-label {
+    -fx-text-fill: #2d7a2d;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.trade-quantity-label {
+    -fx-text-fill: #2b1a0b;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.trade-small-button {
+    -fx-background-color: transparent;
+    -fx-border-color: #3b2108;
+    -fx-border-width: 1.5px;
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-padding: 0;
+}
+
+.trade-target-disabled {
+    -fx-opacity: 0.35;
+}
+
+.trade-target-card {
+    -fx-background-color: rgba(115, 78, 42, 0.55);
+    -fx-border-color: #4b2b12;
+    -fx-border-width: 2px;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 6px;
+    -fx-cursor: hand;
+    -fx-alignment: center;
+}
+
+.trade-target-card:hover {
+    -fx-background-color: rgba(150, 105, 58, 0.70);
+}
+
+.trade-target-name {
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.trade-target-selected {
+    -fx-border-color: #f4c542;
+    -fx-border-width: 3px;
+    -fx-effect: dropshadow(gaussian, #f4c542, 12, 0.65, 0, 0);
+}
+
+.trade-disabled {
+    -fx-opacity: 0.35;
+}
+
+.trade-selected {
+    -fx-effect: dropshadow(gaussian, rgba(114, 187, 255, 0.8), 8, 0.4, 0, 0);
+}
+
+.trade-checkmark {
+    -fx-text-fill: #1f1f1f;
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+}
+
+.trade-error-label {
+    -fx-text-fill: #b7261e;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.trade-info-message-label {
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.trade-offer-section-container {
+    -fx-alignment: center-left;
+}
+
+.trade-offer-resource-container {
+    -fx-spacing: 12px;
+    -fx-alignment: center-left;
+}
+
+.trade-offer-resource-row {
+    -fx-spacing: 12px;
+    -fx-alignment: center-left;
+}
+
+.trade-offer-resource-item {
+    -fx-alignment: center;
+    -fx-spacing: 4px;
+}
+
+.trade-offer-quantity-label {
+    -fx-text-fill: #2b1a0b;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.trade-offer-player-name {
+    -fx-text-fill: #2b1a0b;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.buy-experiment-resource-row {
+    -fx-spacing: 18px;
+    -fx-alignment: center;
+}
+
+.buy-experiment-resource-item {
+    -fx-spacing: 4px;
+    -fx-alignment: center;
+}
+
+.buy-experiment-resource-qty {
+    -fx-text-fill: #2b1a0b;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.buy-experiment-plus-label {
+    -fx-text-fill: #2b1a0b;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+}
+
+.buy-experiment-error-label {
+    -fx-text-fill: #b7261e;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.dice-manual-combo {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.dice-manual-error-label {
+    -fx-text-fill: #b7261e;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.dice-manual-image {
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 4, 0.4, 0, 2);
+}
+
+.victory-player-name {
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+}
+
+.victory-winner-name {
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 30px;
+    -fx-font-weight: bold;
+}
+
+.victory-points-label {
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+}
+
+.victory-winner-score-label {
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 36px;
+    -fx-font-weight: bold;
+}
+
+.victory-click-zone {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-cursor: hand;
+}
+
+.victory-click-zone:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================================
+   GAME REVISION STYLES
+   ============================================================ */
+
+.gr-turn-label {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 27px;
+    -fx-text-fill: white;
+    -fx-text-overrun: clip;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.7), 4, 0, 1, 1);
+}
+
+.gr-phase-label {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 20px;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.7), 4, 0, 1, 1);
+}
+
+.gr-timer-label {
+    -fx-font-family: "Intro";
+    -fx-font-size: 26px;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.7), 4, 0, 1, 1);
+}
+
+.gr-section-header {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 18px;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.7), 3, 0, 1, 1);
+}
+
+.gr-player-name {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 13px;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.gr-stat-label {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 11px;
+    -fx-text-fill: black;
+    -fx-font-weight: bold;
+}
+
+.gr-harbor-label {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 14px;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, black, 3, 0, 0, 1);
+}
+
+.gr-resource-card {
+    -fx-background-color: rgba(60,35,10,0.82);
+    -fx-background-radius: 8px;
+    -fx-border-color: rgba(200,150,60,0.6);
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 8px;
+}
+
+.gr-resource-name {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 11px;
+    -fx-text-fill: #f5e8c0;
+    -fx-font-weight: bold;
+}
+
+.gr-experiment-card {
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 4, 0, 1, 2);
+}
+
+.gr-badge-label {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 10px;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.gr-top-bar-btn {
+    -fx-font-family: "Arcade Normal";
+    -fx-background-color: rgba(60,35,10,0.85);
+    -fx-border-color: rgba(200,150,60,0.7);
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.gr-top-bar-btn:hover {
+    -fx-background-color: rgba(90,55,15,0.9);
+}
+
+.gr-info-pane {
+    -fx-background-color: rgba(30,18,5,0.55);
+    -fx-background-radius: 10px;
+    -fx-border-color: rgba(180,130,50,0.4);
+    -fx-border-width: 1px;
+    -fx-border-radius: 10px;
+}
+
+.gr-log-entry {
+    -fx-font-family: "Arcade Normal";
+    -fx-font-size: 10px;
+    -fx-text-fill: #3b2108;
+    -fx-wrap-text: true;
+}
+
+.popup-close-hitbox {
+    -fx-background-color: rgba(255, 255, 255, 0.01);
+    -fx-border-color: transparent;
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 14px;
+    -fx-background-radius: 14px;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.popup-close-hitbox:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.20);
+    -fx-border-color: rgba(255, 255, 255, 0.85);
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.45), 8, 0.2, 0, 0);
+}
+
+.popup-close-hitbox:pressed {
+    -fx-background-color: rgba(0, 0, 0, 0.22);
+    -fx-border-color: rgba(255, 255, 255, 0.60);
+}
