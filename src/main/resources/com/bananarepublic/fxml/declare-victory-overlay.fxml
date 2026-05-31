@@ -26,7 +26,7 @@
                                     </image>
                                 </ImageView>
 
-                                <ImageView fitHeight="231.0" fitWidth="850.0" layoutX="574.0" layoutY="32.0" mouseTransparent="true"
+                                <ImageView fitHeight="216.0" fitWidth="835.0" layoutX="574.0" layoutY="32.0" mouseTransparent="true"
                                            preserveRatio="false" smooth="true">
                                     <image>
                                         <Image url="@../images/declare_victory/TheEndSign.png"/>
@@ -54,19 +54,19 @@
                                     </image>
                                 </ImageView>
 
-                                <ImageView fitHeight="160.0" fitWidth="322.0" layoutX="1026.0" layoutY="875.0" mouseTransparent="true"
+                                <ImageView fitHeight="160.0" fitWidth="322.0" layoutX="1026.0" layoutY="855.0" mouseTransparent="true"
                                            preserveRatio="false" smooth="true">
                                     <image>
                                         <Image url="@../images/declare_victory/MainmenuButton.png"/>
                                     </image>
                                 </ImageView>
 
-                                <ImageView fx:id="winnerProfileImageView" fitHeight="112.0" fitWidth="112.0" layoutX="755.0" layoutY="307.0"
+                                <ImageView fx:id="winnerProfileImageView" fitHeight="112.0" fitWidth="112.0" layoutX="770.0" layoutY="307.0"
                                            preserveRatio="true" smooth="true"/>
-                                <Label fx:id="winnerNameLabel" alignment="CENTER" layoutX="981.0" layoutY="313.0"
-                                       prefHeight="64.0" prefWidth="262.0" styleClass="victory-winner-name" text="Winner"/>
-                                <Label fx:id="winnerPointsLabel" alignment="CENTER" layoutX="1036.0" layoutY="392.0"
-                                       prefHeight="56.0" prefWidth="124.0" styleClass="victory-winner-score-label" text="10"/>
+                                <Label fx:id="winnerNameLabel" alignment="CENTER" layoutX="981.0" layoutY="327.0"
+                                       prefHeight="67.0" prefWidth="265.0" styleClass="victory-winner-name" text="Winner"/>
+                                <Label fx:id="winnerPointsLabel" alignment="CENTER" layoutX="1040.0" layoutY="398.0"
+                                       prefHeight="59.0" prefWidth="127.0" styleClass="victory-winner-score-label" text="10"/>
 
                                 <ImageView fx:id="row1ProfileImageView" fitHeight="42.0" fitWidth="42.0" layoutX="760.0" layoutY="557.0" preserveRatio="true" smooth="true"/>
                                 <ImageView fx:id="row2ProfileImageView" fitHeight="42.0" fitWidth="42.0" layoutX="760.0" layoutY="621.0" preserveRatio="true" smooth="true"/>
@@ -78,14 +78,14 @@
                                 <Label fx:id="row3NameLabel" alignment="CENTER_LEFT" layoutX="818.0" layoutY="685.0" prefHeight="42.0" prefWidth="320.0" styleClass="victory-player-name" text="Player 3"/>
                                 <Label fx:id="row4NameLabel" alignment="CENTER_LEFT" layoutX="818.0" layoutY="749.0" prefHeight="42.0" prefWidth="320.0" styleClass="victory-player-name" text="Player 4"/>
 
-                                <Label fx:id="row1PointsLabel" alignment="CENTER_RIGHT" layoutX="1204.0" layoutY="557.0" prefHeight="42.0" prefWidth="76.0" styleClass="victory-points-label" text="10"/>
-                                <Label fx:id="row2PointsLabel" alignment="CENTER_RIGHT" layoutX="1204.0" layoutY="621.0" prefHeight="42.0" prefWidth="76.0" styleClass="victory-points-label" text="8"/>
-                                <Label fx:id="row3PointsLabel" alignment="CENTER_RIGHT" layoutX="1204.0" layoutY="685.0" prefHeight="42.0" prefWidth="76.0" styleClass="victory-points-label" text="6"/>
-                                <Label fx:id="row4PointsLabel" alignment="CENTER_RIGHT" layoutX="1204.0" layoutY="749.0" prefHeight="42.0" prefWidth="76.0" styleClass="victory-points-label" text="4"/>
+                                <Label fx:id="row1PointsLabel" alignment="CENTER_RIGHT" layoutX="1148.0" layoutY="557.0" prefHeight="42.0" prefWidth="76.0" styleClass="victory-points-label" text="10"/>
+                                <Label fx:id="row2PointsLabel" alignment="CENTER_RIGHT" layoutX="1148.0" layoutY="621.0" prefHeight="42.0" prefWidth="76.0" styleClass="victory-points-label" text="8"/>
+                                <Label fx:id="row3PointsLabel" alignment="CENTER_RIGHT" layoutX="1148.0" layoutY="685.0" prefHeight="42.0" prefWidth="76.0" styleClass="victory-points-label" text="6"/>
+                                <Label fx:id="row4PointsLabel" alignment="CENTER_RIGHT" layoutX="1148.0" layoutY="749.0" prefHeight="42.0" prefWidth="76.0" styleClass="victory-points-label" text="4"/>
 
                                 <Button fx:id="victorySaveButton" layoutX="651.0" layoutY="875.0" onAction="#onVictorySaveClicked"
                                         opacity="0.0" prefHeight="161.0" prefWidth="329.0" styleClass="victory-click-zone"/>
-                                <Button fx:id="victoryMainMenuButton" layoutX="1026.0" layoutY="875.0" onAction="#onVictoryMainMenuClicked"
+                                <Button fx:id="victoryMainMenuButton" layoutX="1026.0" layoutY="855.0" onAction="#onVictoryMainMenuClicked"
                                         opacity="0.0" prefHeight="160.0" prefWidth="322.0" styleClass="victory-click-zone"/>
                             </children>
                         </Pane>
