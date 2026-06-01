@@ -1,0 +1,130 @@
+package com.bananarepublic;
+
+import com.bananarepublic.controller.GameController;
+import com.bananarepublic.session.GameSession;
+import engine.GameEngine;
+import engine.GameStateImpl;
+import model.board.Board;
+import model.board.HexCoordinate;
+import model.board.StandardMapGenerator;
+import model.card.CardDeck;
+import model.card.CardFactory;
+import model.player.HumanPlayer;
+import model.player.Player;
+import model.player.PlayerColor;
+import model.resource.ResourceBank;
+import persistence.SaveData;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Factory untuk membangun dan mewiring GameEngine + GameController.
+ * Dipanggil oleh LobbyController saat game baru dimulai.
+ */
+public final class GameFactory {
+
+    private GameFactory() {}
+
+    /**
+     * Buat GameController lengkap dari GameSession (new game).
+     * Urutan: buat players → board → bank → deck → state → engine → controller
+     */
+    public static GameController build() {
+        List<String> names = GameSession.getPlayerNames();
+
+        // ── Players ───────────────────────────────────────────────────
+        PlayerColor[] colors = PlayerColor.values(); // RED, BLUE, GREEN, YELLOW
+        List<Player> players = new ArrayList<>();
+        for (int i = 0; i < names.size(); i++) {
+            players.add(new HumanPlayer(names.get(i), colors[i % colors.length]));
+        }
+
+        // ── Board ─────────────────────────────────────────────────────
+        Board board = new StandardMapGenerator().generateBoard();
+
+        // ── Robber starts at desert ───────────────────────────────────
+        HexCoordinate robberStart = board.getAllTiles().stream()
+                .filter(t -> t.getTerrainType() == model.board.TerrainType.DESERT)
+                .map(t -> t.getCoordinate())
+                .findFirst()
+                .orElse(new HexCoordinate(0, 0));
+
+        // ── Bank + Deck ───────────────────────────────────────────────
+        ResourceBank bank = new ResourceBank();
+        CardDeck deck = new CardDeck(CardFactory.createStandardDeck());
+        deck.shuffle();
+
+        // ── Game state + engine ───────────────────────────────────────
+        GameStateImpl state = new GameStateImpl(board, players, bank, deck, robberStart);
+        GameEngine engine   = new GameEngine(state);
+
+        // ── Bridge layer ──────────────────────────────────────────────
+        GameController controller = new GameController(engine);
+        engine.addListener(controller);
+
+        return controller;
+    }
+
+    /**
+     * Buat GameController dari SaveData yang sudah dimuat.
+     * Resources, buildings, pipes, dan kartu di-restore ke state engine.
+     */
+    public static GameController buildFromSave(SaveData saveData) {
+        // ── Players dari save ─────────────────────────────────────────
+        PlayerColor[] colors = PlayerColor.values();
+        List<Player> players = new ArrayList<>();
+        for (int i = 0; i < saveData.players.size(); i++) {
+            SaveData.PlayerData pd = saveData.players.get(i);
+            HumanPlayer player = new HumanPlayer(pd.name, colors[i % colors.length]);
+            // Restore resources
+            if (pd.resources != null) {
+                pd.resources.forEach((key, val) -> {
+                    try {
+                        model.resource.ResourceType type =
+                            model.resource.ResourceType.valueOf(key.toUpperCase());
+                        if (val > 0) player.getInventory().addResource(type, val);
+                    } catch (IllegalArgumentException ignored) {}
+                });
+            }
+            players.add(player);
+        }
+
+        // ── Board ─────────────────────────────────────────────────────
+        // StandardMapGenerator always produces the same 19-tile layout,
+        // so we use it for the engine board. Tile visuals are rendered
+        // from saveData.mapConfig in the UI layer separately.
+        Board board = new StandardMapGenerator().generateBoard();
+
+        // ── Bank ──────────────────────────────────────────────────────
+        ResourceBank bank;
+        if (saveData.bank != null) {
+            java.util.EnumMap<model.resource.ResourceType, Integer> stock =
+                new java.util.EnumMap<>(model.resource.ResourceType.class);
+            saveData.bank.forEach((key, val) -> {
+                try {
+                    stock.put(model.resource.ResourceType.valueOf(key.toUpperCase()), val);
+                } catch (IllegalArgumentException ignored) {}
+            });
+            bank = new ResourceBank(stock);
+        } else {
+            bank = new ResourceBank();
+        }
+
+        // ── Deck ──────────────────────────────────────────────────────
+        CardDeck deck = new CardDeck(CardFactory.createStandardDeck());
+        deck.shuffle();
+
+        // ── Robber ────────────────────────────────────────────────────
+        HexCoordinate robberPos = new HexCoordinate(saveData.robberQ, saveData.robberR);
+
+        // ── State + engine ────────────────────────────────────────────
+        GameStateImpl state = new GameStateImpl(board, players, bank, deck, robberPos);
+        GameEngine engine   = new GameEngine(state);
+
+        GameController controller = new GameController(engine);
+        engine.addListener(controller);
+
+        return controller;
+    }
+}

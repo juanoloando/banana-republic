@@ -1,7 +1,7 @@
 .PHONY: build run test clean all
 
 # JavaFX version
-JFX_VERSION=21.0.2
+JFX_VERSION=21.0.11
 # https://gluonhq.com/products/javafx/
 JAVAFX_SDK_URL=https://download2.gluonhq.com/openjfx/21.0.11/openjfx-21.0.11_linux-x64_bin-sdk.zip
 JAR_NAME=template-if2010-2526-tubes-2-1.0-SNAPSHOT.jar

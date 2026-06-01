@@ -165,10 +165,13 @@ public class LobbyController {
         GameSession.setPlayerNames(names);
         GameSession.clearLoadedSaveData();
 
+        // Buat GameEngine + GameController via GameFactory
+        com.bananarepublic.controller.GameController gc =
+            com.bananarepublic.GameFactory.build();
+        GameSession.setGameController(gc);
+
         System.out.println("Start new game with " + playerCount + " players.");
         System.out.println("Players: " + names);
-        System.out.println("Environment plugin: " + getFilePathOrDefault(environmentDataFile, "default map"));
-        System.out.println("Automation plugin: " + getFilePathOrDefault(automationIntelligenceFile, "no bot plugin"));
 
         BananaRepublic.showGame();
     }
