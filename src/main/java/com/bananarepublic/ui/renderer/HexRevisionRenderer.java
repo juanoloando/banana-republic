@@ -369,6 +369,11 @@ public class HexRevisionRenderer {
         return new PixelPoint(centerX, centerY);
     }
 
+    /** Public accessor for tile center point — used by GameRevisionController for robber move mode. */
+    public PixelPoint computeTileCenterPoint(HexCoordinate coord) {
+        return toCenterPoint(coord);
+    }
+
     private Image loadTerrainImage(TerrainType terrain) {
         String path = switch (terrain) {
             case FOREST      -> "/com/bananarepublic/images/game_revision/hex_forest.png";

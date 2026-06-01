@@ -1184,9 +1184,14 @@ public class GameRevisionController implements GameUICallback {
             }
         }
 
-        // UI-first fallback for trade screen testing when engine resources are not populated yet.
-        if (shouldUseDummyTradeData()) {
+        // UI-first fallback for trade screen testing — only when no live engine is connected.
+        if (gameController == null && shouldUseDummyTradeData()) {
             applyDummyTradeData();
+        }
+
+        // If engine is available, sync real resource counts now
+        if (gameController != null) {
+            syncAllPlayerStocksFromEngine();
         }
 
         initializeBankTradeDummyData();
@@ -3201,16 +3206,38 @@ public class GameRevisionController implements GameUICallback {
             return;
         }
 
-        dummyPlayerResources.put(selectedPlayerGiveResourceUi,
-                dummyPlayerResources.getOrDefault(selectedPlayerGiveResourceUi, 0) - 4);
-        dummyBankResources.put(selectedPlayerGiveResourceUi,
-                dummyBankResources.getOrDefault(selectedPlayerGiveResourceUi, 0) + 4);
-        dummyBankResources.put(selectedBankReceiveResourceUi,
-                dummyBankResources.getOrDefault(selectedBankReceiveResourceUi, 0) - 1);
-        dummyPlayerResources.put(selectedBankReceiveResourceUi,
-                dummyPlayerResources.getOrDefault(selectedBankReceiveResourceUi, 0) + 1);
+        ResourceType give    = toModelResource(selectedPlayerGiveResourceUi);
+        ResourceType receive = toModelResource(selectedBankReceiveResourceUi);
 
-        applyBankTradeToMainStocks();
+        // Update live engine if available; otherwise update local stocks only
+        if (gameController != null && give != null && receive != null) {
+            try {
+                model.player.Player activePlayer = gameController.getActivePlayer();
+                model.resource.Bank bank = gameController.getBank();
+                activePlayer.removeResource(give, 4);
+                bank.returnResource(give, 4);
+                activePlayer.addResource(receive, 1);
+                bank.takeResource(receive, 1);
+            } catch (Exception ex) {
+                appendLog("Bank trade failed: " + ex.getMessage());
+                showBankTradeMessage("Trade failed: " + ex.getMessage(), false);
+                bringBankTradeControlsToFront();
+                return;
+            }
+            syncAllPlayerStocksFromEngine();
+            initializeBankTradeDummyData();
+        } else {
+            dummyPlayerResources.put(selectedPlayerGiveResourceUi,
+                    dummyPlayerResources.getOrDefault(selectedPlayerGiveResourceUi, 0) - 4);
+            dummyBankResources.put(selectedPlayerGiveResourceUi,
+                    dummyBankResources.getOrDefault(selectedPlayerGiveResourceUi, 0) + 4);
+            dummyBankResources.put(selectedBankReceiveResourceUi,
+                    dummyBankResources.getOrDefault(selectedBankReceiveResourceUi, 0) - 1);
+            dummyPlayerResources.put(selectedBankReceiveResourceUi,
+                    dummyPlayerResources.getOrDefault(selectedBankReceiveResourceUi, 0) + 1);
+            applyBankTradeToMainStocks();
+        }
+        refreshInventoryForPlayerIndex(activePlayerIndex);
         updateBankTradeQuantityLabels();
 
         String successMessage = "Bank trade successful! You traded 4 "
@@ -3710,10 +3737,27 @@ public class GameRevisionController implements GameUICallback {
         ResourceType give = selectedHarborGiveResource;
         ResourceType receive = selectedHarborReceiveResource;
 
-        addResourceAmount(activePlayerIndex, give, -requiredAmount);
-        addBankResourceAmount(give, requiredAmount);
-        addBankResourceAmount(receive, -1);
-        addResourceAmount(activePlayerIndex, receive, 1);
+        if (gameController != null) {
+            try {
+                model.player.Player activePlayer = gameController.getActivePlayer();
+                model.resource.Bank bank = gameController.getBank();
+                activePlayer.removeResource(give, requiredAmount);
+                bank.returnResource(give, requiredAmount);
+                activePlayer.addResource(receive, 1);
+                bank.takeResource(receive, 1);
+            } catch (Exception ex) {
+                showHarborTradeMessage("Harbor trade failed: " + ex.getMessage(), false);
+                return;
+            }
+            syncAllPlayerStocksFromEngine();
+            initializeBankTradeDummyData();
+            refreshInventoryForPlayerIndex(activePlayerIndex);
+        } else {
+            addResourceAmount(activePlayerIndex, give, -requiredAmount);
+            addBankResourceAmount(give, requiredAmount);
+            addBankResourceAmount(receive, -1);
+            addResourceAmount(activePlayerIndex, receive, 1);
+        }
         syncTradeStateBackToSaveData();
 
         String successMessage = "Harbor trade successful! You traded "
@@ -3735,17 +3779,49 @@ public class GameRevisionController implements GameUICallback {
     }
 
     private void executeOffer(TradeOfferState offer) {
-        for (ResourceType resourceType : TRADE_RESOURCE_ORDER) {
-            int giveValue = offer.give.getOrDefault(resourceType, 0);
-            int receiveValue = offer.receive.getOrDefault(resourceType, 0);
-
-            if (giveValue > 0) {
-                addResourceAmount(offer.proposerIndex, resourceType, -giveValue);
-                addResourceAmount(offer.receiverIndex, resourceType, giveValue);
+        if (gameController != null) {
+            // Update engine player objects directly; sync local stocks from engine afterward
+            List<model.player.Player> allPlayers = gameController.getAllPlayers();
+            for (ResourceType resourceType : TRADE_RESOURCE_ORDER) {
+                int giveValue    = offer.give.getOrDefault(resourceType, 0);
+                int receiveValue = offer.receive.getOrDefault(resourceType, 0);
+                if (giveValue > 0
+                        && offer.proposerIndex < allPlayers.size()
+                        && offer.receiverIndex < allPlayers.size()) {
+                    try {
+                        allPlayers.get(offer.proposerIndex).removeResource(resourceType, giveValue);
+                        allPlayers.get(offer.receiverIndex).addResource(resourceType, giveValue);
+                    } catch (Exception ex) {
+                        appendLog("Trade sync error: " + ex.getMessage());
+                    }
+                }
+                if (receiveValue > 0
+                        && offer.proposerIndex < allPlayers.size()
+                        && offer.receiverIndex < allPlayers.size()) {
+                    try {
+                        allPlayers.get(offer.receiverIndex).removeResource(resourceType, receiveValue);
+                        allPlayers.get(offer.proposerIndex).addResource(resourceType, receiveValue);
+                    } catch (Exception ex) {
+                        appendLog("Trade sync error: " + ex.getMessage());
+                    }
+                }
             }
-            if (receiveValue > 0) {
-                addResourceAmount(offer.receiverIndex, resourceType, -receiveValue);
-                addResourceAmount(offer.proposerIndex, resourceType, receiveValue);
+            syncAllPlayerStocksFromEngine();
+            initializeBankTradeDummyData();
+            refreshInventoryForPlayerIndex(activePlayerIndex);
+        } else {
+            // No engine – update local stocks only
+            for (ResourceType resourceType : TRADE_RESOURCE_ORDER) {
+                int giveValue    = offer.give.getOrDefault(resourceType, 0);
+                int receiveValue = offer.receive.getOrDefault(resourceType, 0);
+                if (giveValue > 0) {
+                    addResourceAmount(offer.proposerIndex, resourceType, -giveValue);
+                    addResourceAmount(offer.receiverIndex, resourceType, giveValue);
+                }
+                if (receiveValue > 0) {
+                    addResourceAmount(offer.receiverIndex, resourceType, -receiveValue);
+                    addResourceAmount(offer.proposerIndex, resourceType, receiveValue);
+                }
             }
         }
         syncTradeStateBackToSaveData();
@@ -3966,9 +4042,33 @@ public class GameRevisionController implements GameUICallback {
         appendLog("─── Giliran " + nextName + " ───");
     }
 
-    /** Load and display inventory for a given player index from stored data. */
+    /** Load and display inventory for a given player index. Prefers live engine data. */
     private void refreshInventoryForPlayerIndex(int idx) {
-        // Resources
+        if (gameController != null) {
+            List<model.player.Player> allPlayers = gameController.getAllPlayers();
+            if (idx >= 0 && idx < allPlayers.size()) {
+                model.player.Player p = allPlayers.get(idx);
+                // Sync this player's stock into local map
+                ensurePlayerStockCapacity(idx + 1);
+                EnumMap<ResourceType, Integer> stock = playerResourceStocks.get(idx);
+                for (ResourceType type : ResourceType.values()) {
+                    stock.put(type, p.getResourceCount(type));
+                }
+                // Display resources from engine
+                Map<ResourceType, Integer> nonZero = new EnumMap<>(ResourceType.class);
+                stock.forEach((k, v) -> { if (v > 0) nonZero.put(k, v); });
+                playerResourceCounts.clear();
+                playerResourceCounts.putAll(nonZero);
+                refreshResourceCards(nonZero);
+                // Display cards from engine
+                refreshExperimentInventory(
+                    countCards(p, model.card.CardCategory.KNIGHT),
+                    countCards(p, model.card.CardCategory.PROGRESS),
+                    countCards(p, model.card.CardCategory.VICTORY_POINT));
+                return;
+            }
+        }
+        // Fallback: local stock
         if (idx < playerResourceStocks.size()) {
             EnumMap<ResourceType, Integer> stock = playerResourceStocks.get(idx);
             Map<ResourceType, Integer> nonZero = new EnumMap<>(ResourceType.class);
@@ -3980,7 +4080,7 @@ public class GameRevisionController implements GameUICallback {
             inventoryResourceRow.getChildren().clear();
             resourceBadgeLabels.clear();
         }
-        // Experiment cards
+        // Experiment cards from save data
         SaveData saveData = GameSession.getLoadedSaveData();
         if (saveData != null && saveData.players != null && idx < saveData.players.size()) {
             SaveData.PlayerData pd = saveData.players.get(idx);
@@ -3991,6 +4091,32 @@ public class GameRevisionController implements GameUICallback {
             );
         } else {
             inventoryCardRow.getChildren().clear();
+        }
+    }
+
+    /**
+     * Reads all player resource counts from the live engine and writes them into
+     * {@code playerResourceStocks} and {@code bankStock}.  Must be called on the FX thread
+     * (or wrapped in Platform.runLater) because it may update UI-backing maps.
+     */
+    private void syncAllPlayerStocksFromEngine() {
+        if (gameController == null) return;
+        List<model.player.Player> allPlayers = gameController.getAllPlayers();
+        ensurePlayerStockCapacity(allPlayers.size());
+        for (int i = 0; i < allPlayers.size(); i++) {
+            model.player.Player p = allPlayers.get(i);
+            EnumMap<ResourceType, Integer> stock = playerResourceStocks.get(i);
+            for (ResourceType type : ResourceType.values()) {
+                stock.put(type, p.getResourceCount(type));
+            }
+        }
+        // Sync bank stock
+        model.resource.Bank bank = gameController.getBank();
+        for (ResourceType type : ResourceType.values()) {
+            bankStock.put(type, bank.getAvailable(type));
+        }
+        if ("bank".equals(activeInfoPanel)) {
+            buildBankCards();
         }
     }
 
@@ -4146,6 +4272,47 @@ public class GameRevisionController implements GameUICallback {
         hideBuildPopup();
         pendingBuildType = BuildType.NONE;
         pendingBuildId   = -1;
+    }
+
+    private static final String ROBBER_ZONE_TAG = "robber-move-zone";
+
+    /** Overlays clickable highlight circles on all tiles except the current robber position. */
+    private void enterRobberMoveMode() {
+        if (currentBoard == null || gameController == null) return;
+        exitRobberMoveMode(); // clear any previous zones
+        HexCoordinate currentRobberPos = gameController.getRobberPosition();
+
+        for (model.board.HexTile tile : currentBoard.getAllTiles()) {
+            model.board.HexCoordinate coord = tile.getCoordinate();
+            if (coord.equals(currentRobberPos)) continue;
+
+            com.bananarepublic.ui.renderer.HexRevisionRenderer.PixelPoint center =
+                hexRevisionRenderer.computeTileCenterPoint(coord);
+
+            javafx.scene.shape.Circle zone = new javafx.scene.shape.Circle(
+                center.x(), center.y(), 48);
+            zone.setFill(javafx.scene.paint.Color.web("#cc8800", 0.22));
+            zone.setStroke(javafx.scene.paint.Color.web("#8B4513", 0.75));
+            zone.setStrokeWidth(2.5);
+            zone.setCursor(javafx.scene.Cursor.HAND);
+            zone.setUserData(ROBBER_ZONE_TAG);
+            zone.setOnMouseClicked(ev -> {
+                ev.consume();
+                exitRobberMoveMode();
+                try {
+                    gameController.moveRobber(coord);
+                } catch (Exception ex) {
+                    appendLog("Cannot move robber there: " + ex.getMessage());
+                    enterRobberMoveMode();
+                }
+            });
+            circleLayer.getChildren().add(zone);
+        }
+    }
+
+    /** Removes robber-move highlight circles. */
+    private void exitRobberMoveMode() {
+        circleLayer.getChildren().removeIf(n -> ROBBER_ZONE_TAG.equals(n.getUserData()));
     }
 
     private void onIntersectionCircleClicked(int intersectionId, boolean isLab) {
@@ -4366,19 +4533,19 @@ public class GameRevisionController implements GameUICallback {
 
     private String getPlayerColorName(int idx) {
         return switch (idx % 4) {
-            case 0 -> "red";
+            case 0 -> "yellow";
             case 1 -> "blue";
-            case 2 -> "green";
-            default -> "yellow";
+            case 2 -> "red";
+            default -> "green";
         };
     }
 
     private javafx.scene.paint.Color getPlayerJavafxColor(int idx) {
         return switch (idx % 4) {
-            case 0 -> javafx.scene.paint.Color.RED;
+            case 0 -> javafx.scene.paint.Color.GOLD;
             case 1 -> javafx.scene.paint.Color.DODGERBLUE;
-            case 2 -> javafx.scene.paint.Color.LIMEGREEN;
-            default -> javafx.scene.paint.Color.GOLD;
+            case 2 -> javafx.scene.paint.Color.RED;
+            default -> javafx.scene.paint.Color.LIMEGREEN;
         };
     }
 
@@ -4731,6 +4898,7 @@ public class GameRevisionController implements GameUICallback {
                 diceRolled = false;
                 diceRollMode = DiceRollMode.NONE;
                 exitBuildMode();
+                exitRobberMoveMode();
                 if (previousPhase == TurnPhase.SETUP_PLACE_SECOND) {
                     appendLog("Initial setup complete. Normal turns begin.");
                     if (gameController != null) {
@@ -4740,6 +4908,7 @@ public class GameRevisionController implements GameUICallback {
             }
             case TRADE_BUILD -> {
                 updatePhaseDisplay(true);
+                exitRobberMoveMode();
                 tryAutoEnterBuildMode();
                 startTurnTimer(DEFAULT_TURN_SECONDS);
             }
@@ -4749,6 +4918,8 @@ public class GameRevisionController implements GameUICallback {
             }
             case ROBBER_MOVE -> {
                 appendLog("Move Nimon Ungu to another tile.");
+                showCenteredWarning("Click a tile to place Nimon Ungu!", 4000, "#8B4513");
+                enterRobberMoveMode();
             }
             case GAME_OVER -> {
                 stopTimer();
@@ -4790,11 +4961,12 @@ public class GameRevisionController implements GameUICallback {
 
     @Override
     public void onTurnChanged(Player newActivePlayer) {
-        // Update UI — JANGAN startTurnTimer() di sini, timer mulai dari TRADE_BUILD
         activePlayerIndex = gameController != null
             ? gameController.getCurrentPlayerIdx() : (activePlayerIndex + 1) % playerCount;
         updateTurnDisplay(newActivePlayer.getName());
+        if (gameController != null) syncAllPlayerStocksFromEngine();
         refreshInventoryForPlayerIndex(activePlayerIndex);
+        initializeBankTradeDummyData();
         appendLog("─── Giliran " + newActivePlayer.getName() + " ───");
     }
 
@@ -4821,32 +4993,135 @@ public class GameRevisionController implements GameUICallback {
 
     @Override
     public void onResourcesDistributed(Player activePlayer) {
-        // Refresh inventory untuk SEMUA player (resource berubah)
         if (gameController != null) {
-            // Refresh active player inventory
-            refreshInventory(gameController.getActivePlayer());
+            syncAllPlayerStocksFromEngine();
+            refreshInventoryForPlayerIndex(activePlayerIndex);
             refreshBankPanel(gameController.getBank());
+            initializeBankTradeDummyData();
         }
     }
 
     @Override
     public void onRobberMoved(HexCoordinate newPosition) {
-        // Re-render board dengan posisi robber baru
         if (currentBoard != null) {
             hexRevisionRenderer.render(boardPane,
                 currentBoard.getAllTiles(), newPosition, currentBoard);
+            setupBoardLayers();
         }
-        // Jika ada kandidat curi
-        if (gameController != null && !gameController.getStealCandidates().isEmpty()) {
-            appendLog("⚔ Pilih pemain untuk dicuri resource-nya (atau abaikan).");
-            // TODO: Buka StealCardDialog saat tersedia
+        appendLog("Nimon Ungu moved.");
+        showStealDialogIfNeeded();
+    }
+
+    private void showStealDialogIfNeeded() {
+        if (gameController == null) return;
+        List<model.player.Player> candidates = gameController.getStealCandidates();
+        if (candidates.isEmpty()) {
+            appendLog("No steal candidates.");
+            return;
         }
+        showStealDialog(candidates);
+    }
+
+    private void showStealDialog(List<model.player.Player> candidates) {
+        StackPane overlay = new StackPane();
+        overlay.setStyle("-fx-background-color: rgba(0,0,0,0.65);");
+        overlay.prefWidthProperty().bind(rootPane.widthProperty());
+        overlay.prefHeightProperty().bind(rootPane.heightProperty());
+        overlay.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
+        VBox dialog = new VBox(16);
+        dialog.setMaxWidth(400);
+        dialog.setStyle("-fx-background-color: #f5e8c8; -fx-border-color: #7a4a23; "
+            + "-fx-border-width: 3; -fx-padding: 26; -fx-background-radius: 14; -fx-border-radius: 14;");
+        dialog.setAlignment(Pos.CENTER);
+
+        Label header = new Label("Resource Theft");
+        header.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2f2010;");
+
+        Label sub = new Label("Select a player to steal from, or skip.");
+        sub.setStyle("-fx-font-size: 13px; -fx-text-fill: #3d2008;");
+        sub.setWrapText(true);
+
+        HBox playerRow = new HBox(16);
+        playerRow.setAlignment(Pos.CENTER);
+
+        model.player.Player[] selected = {null};
+        List<VBox> cards = new ArrayList<>();
+
+        String normalStyle = "-fx-background-color: #ece0c0; -fx-padding: 14; "
+            + "-fx-background-radius: 10; -fx-cursor: hand; -fx-border-width: 2; "
+            + "-fx-border-color: transparent; -fx-border-radius: 10;";
+        String selectedStyle = "-fx-background-color: #c8961e; -fx-padding: 14; "
+            + "-fx-background-radius: 10; -fx-cursor: hand; -fx-border-width: 2; "
+            + "-fx-border-color: #7a4a23; -fx-border-radius: 10;";
+
+        for (model.player.Player candidate : candidates) {
+            VBox card = new VBox(8);
+            card.setAlignment(Pos.CENTER);
+            card.setPrefWidth(100);
+            card.setStyle(normalStyle);
+
+            Label nameLabel = new Label(candidate.getName());
+            nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #2f2010;");
+            nameLabel.setMouseTransparent(true);
+
+            Label resLabel = new Label(candidate.getTotalResourceCount() + " cards");
+            resLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #5b2e0a;");
+            resLabel.setMouseTransparent(true);
+
+            card.getChildren().addAll(nameLabel, resLabel);
+            card.setOnMouseClicked(ev -> {
+                selected[0] = candidate;
+                for (VBox c : cards) c.setStyle(normalStyle);
+                card.setStyle(selectedStyle);
+            });
+            cards.add(card);
+            playerRow.getChildren().add(card);
+        }
+
+        HBox buttonRow = new HBox(16);
+        buttonRow.setAlignment(Pos.CENTER);
+
+        Button skipBtn = new Button("SKIP");
+        skipBtn.setStyle("-fx-background-color: #a09080; -fx-text-fill: white; -fx-font-size: 13px; "
+            + "-fx-pref-width: 110; -fx-pref-height: 38; -fx-background-radius: 8;");
+        skipBtn.setOnAction(ev -> {
+            rootPane.getChildren().remove(overlay);
+            appendLog("Steal skipped.");
+        });
+
+        Button stealBtn = new Button("CONFIRM STEAL");
+        stealBtn.setStyle("-fx-background-color: #7a4a23; -fx-text-fill: white; -fx-font-size: 13px; "
+            + "-fx-font-weight: bold; -fx-pref-width: 160; -fx-pref-height: 38; -fx-background-radius: 8;");
+        stealBtn.setOnAction(ev -> {
+            if (selected[0] == null) {
+                sub.setText("Please select a player first.");
+                sub.setStyle("-fx-font-size: 13px; -fx-text-fill: #b7261e;");
+                return;
+            }
+            rootPane.getChildren().remove(overlay);
+            try {
+                gameController.stealFromPlayer(selected[0]);
+            } catch (Exception ex) {
+                appendLog("Steal failed: " + ex.getMessage());
+            }
+        });
+
+        buttonRow.getChildren().addAll(skipBtn, stealBtn);
+        dialog.getChildren().addAll(header, sub, playerRow, buttonRow);
+        StackPane.setAlignment(dialog, Pos.CENTER);
+        overlay.getChildren().add(dialog);
+        rootPane.getChildren().add(overlay);
+        overlay.toFront();
     }
 
     @Override
     public void onResourcesDiscarded(Player player) {
         if (gameController != null) {
+            syncAllPlayerStocksFromEngine();
+            refreshInventoryForPlayerIndex(activePlayerIndex);
             refreshBankPanel(gameController.getBank());
+            initializeBankTradeDummyData();
         }
         appendLog("🗑 " + player.getName() + " membuang kartu resource.");
     }
@@ -4856,7 +5131,9 @@ public class GameRevisionController implements GameUICallback {
         appendLog("⚔ " + thief.getName() + " mencuri "
                   + stolenResource.name().toLowerCase() + " dari " + victim.getName());
         if (gameController != null) {
-            refreshInventory(gameController.getActivePlayer());
+            syncAllPlayerStocksFromEngine();
+            refreshInventoryForPlayerIndex(activePlayerIndex);
+            initializeBankTradeDummyData();
         }
     }
 
@@ -4960,17 +5237,143 @@ public class GameRevisionController implements GameUICallback {
     private void openDiscardDialogSequence() {
         if (gameController == null) return;
         discardQueue = new java.util.ArrayDeque<>(gameController.getPlayersRequiredToDiscard());
+        if (discardQueue.isEmpty()) {
+            // Nobody has >7 cards — skip discard, go straight to robber placement
+            appendLog("No players need to discard. Move Nimon Ungu.");
+            showCenteredWarning("Click a tile to place Nimon Ungu!", 4000, "#8B4513");
+            enterRobberMoveMode();
+            return;
+        }
         processNextDiscard();
     }
 
     private void processNextDiscard() {
-        if (discardQueue.isEmpty()) return; // semua sudah discard
+        if (discardQueue.isEmpty()) return;
         model.player.Player current = discardQueue.poll();
         int count = gameController.computeDiscardCount(current);
         appendLog("⚠ " + current.getName() + " harus buang " + count + " kartu resource.");
-        // TODO: Buka DiscardDialog UI (menunggu asset popup_discard.png)
-        // Sementara: auto-discard random untuk tidak block game flow
-        // discardOverlay.showForPlayer(current, count, () -> processNextDiscard());
+        showDiscardDialog(current, count, this::processNextDiscard);
+    }
+
+    private void showDiscardDialog(model.player.Player player, int count, Runnable onComplete) {
+        StackPane overlay = new StackPane();
+        overlay.setStyle("-fx-background-color: rgba(0,0,0,0.68);");
+        overlay.prefWidthProperty().bind(rootPane.widthProperty());
+        overlay.prefHeightProperty().bind(rootPane.heightProperty());
+        overlay.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
+        VBox dialog = new VBox(14);
+        dialog.setMaxWidth(540);
+        dialog.setStyle("-fx-background-color: #f5e8c8; -fx-border-color: #7a4a23; "
+            + "-fx-border-width: 3; -fx-padding: 26; -fx-background-radius: 14; -fx-border-radius: 14;");
+        dialog.setAlignment(Pos.CENTER_LEFT);
+
+        Label header = new Label("⚠ Hand Limit Exceeded!");
+        header.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #b7261e;");
+
+        Label sub = new Label("A 7 was rolled.  " + player.getName() + " has "
+            + player.getTotalResourceCount() + " cards.  Must discard " + count + ".");
+        sub.setStyle("-fx-font-size: 13px; -fx-text-fill: #3d2008;");
+        sub.setWrapText(true);
+
+        EnumMap<ResourceType, Integer> discardMap = new EnumMap<>(ResourceType.class);
+        for (ResourceType type : ResourceType.values()) discardMap.put(type, 0);
+
+        Label selectedLabel = new Label("0 / " + count + " Selected");
+        selectedLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #3d2008; -fx-font-weight: bold;");
+
+        HBox resourceRow = new HBox(14);
+        resourceRow.setAlignment(Pos.CENTER_LEFT);
+
+        for (ResourceType type : ResourceType.values()) {
+            int held = player.getResourceCount(type);
+            if (held <= 0) continue;
+
+            VBox cell = new VBox(6);
+            cell.setAlignment(Pos.CENTER);
+            cell.setStyle("-fx-background-color: #ece0c0; -fx-padding: 8; -fx-background-radius: 8;");
+
+            ImageView icon = new ImageView(loadInventoryImage(type));
+            icon.setFitWidth(50);
+            icon.setFitHeight(70);
+            icon.setPreserveRatio(false);
+
+            Label holdLabel = new Label("Hold: " + held);
+            holdLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #5b2e0a;");
+
+            Label qtyLabel = new Label("0");
+            qtyLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2f2010;");
+            qtyLabel.setPrefWidth(28);
+            qtyLabel.setAlignment(Pos.CENTER);
+
+            Button minus = new Button("-");
+            minus.setStyle("-fx-font-size: 12px; -fx-background-color: #c8a060; -fx-text-fill: white; "
+                + "-fx-pref-width: 26; -fx-pref-height: 26; -fx-background-radius: 4;");
+            minus.setDisable(true);
+
+            Button plus = new Button("+");
+            plus.setStyle("-fx-font-size: 12px; -fx-background-color: #7a4a23; -fx-text-fill: white; "
+                + "-fx-pref-width: 26; -fx-pref-height: 26; -fx-background-radius: 4;");
+
+            HBox ctrl = new HBox(4, minus, qtyLabel, plus);
+            ctrl.setAlignment(Pos.CENTER);
+
+            Label typeName = new Label(resourceDisplayName(type).toUpperCase());
+            typeName.setStyle("-fx-font-size: 9px; -fx-text-fill: #5b2e0a; -fx-font-weight: bold;");
+
+            minus.setOnAction(ev -> {
+                int cur = discardMap.get(type);
+                if (cur > 0) {
+                    discardMap.put(type, cur - 1);
+                    qtyLabel.setText(String.valueOf(cur - 1));
+                    minus.setDisable(cur - 1 <= 0);
+                    plus.setDisable(false);
+                    int total = discardMap.values().stream().mapToInt(Integer::intValue).sum();
+                    selectedLabel.setText(total + " / " + count + " Selected");
+                    selectedLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: "
+                        + (total == count ? "#1a8917" : "#3d2008") + ";");
+                }
+            });
+
+            plus.setOnAction(ev -> {
+                int cur = discardMap.get(type);
+                int total = discardMap.values().stream().mapToInt(Integer::intValue).sum();
+                if (cur < held && total < count) {
+                    discardMap.put(type, cur + 1);
+                    qtyLabel.setText(String.valueOf(cur + 1));
+                    minus.setDisable(false);
+                    int newTotal = total + 1;
+                    plus.setDisable(cur + 1 >= held || newTotal >= count);
+                    selectedLabel.setText(newTotal + " / " + count + " Selected");
+                    selectedLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: "
+                        + (newTotal == count ? "#1a8917" : "#3d2008") + ";");
+                }
+            });
+
+            cell.getChildren().addAll(icon, holdLabel, ctrl, typeName);
+            resourceRow.getChildren().add(cell);
+        }
+
+        Button confirmBtn = new Button("CONFIRM DISCARD");
+        confirmBtn.setStyle("-fx-background-color: #7a4a23; -fx-text-fill: white; -fx-font-size: 14px; "
+            + "-fx-font-weight: bold; -fx-pref-width: 200; -fx-pref-height: 42; -fx-background-radius: 8;");
+        confirmBtn.setOnAction(ev -> {
+            int total = discardMap.values().stream().mapToInt(Integer::intValue).sum();
+            if (total != count) {
+                selectedLabel.setText("Must discard exactly " + count + " (selected: " + total + ")");
+                selectedLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #b7261e;");
+                return;
+            }
+            rootPane.getChildren().remove(overlay);
+            gameController.discardResources(player, discardMap);
+            onComplete.run();
+        });
+
+        dialog.getChildren().addAll(header, sub, resourceRow, selectedLabel, confirmBtn);
+        StackPane.setAlignment(dialog, Pos.CENTER);
+        overlay.getChildren().add(dialog);
+        rootPane.getChildren().add(overlay);
+        overlay.toFront();
     }
 
     // ── Phase gating & centered warnings ────────────────────────────
@@ -5087,6 +5490,11 @@ public class GameRevisionController implements GameUICallback {
     private void onTradeClicked() {
         if (!requireDiceRolled()) return;
         System.out.println("[TradeUI] Trade button clicked");
+        // Always sync latest resource counts before showing trade UI
+        if (gameController != null) {
+            syncAllPlayerStocksFromEngine();
+            initializeBankTradeDummyData();
+        }
         currentProposerIndex = Math.max(0, Math.min(activePlayerIndex, Math.max(playerResourceStocks.size() - 1, 0)));
         currentReceiverIndex = playerResourceStocks.size() > 1
                 ? (currentProposerIndex + 1) % playerResourceStocks.size()
