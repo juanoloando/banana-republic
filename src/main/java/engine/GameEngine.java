@@ -125,6 +125,9 @@ public class GameEngine {
                 intersectionId, isSetup);
 
         if (!isSetup) {
+            if (!player.canAfford(model.building.BuildCost.SETTLEMENT.getAllCosts())) {
+                throw new InvalidBuildException("Not enough resources to build Watch Post.");
+            }
             payBuildCost(player, model.building.BuildCost.SETTLEMENT);
         }
 
@@ -141,31 +144,23 @@ public class GameEngine {
         lastPlacedSettlementId = intersectionId;
         notifyListeners(l -> l.onBuildingPlaced(player, intersectionId, "Settlement"));
 
-        if (isSetup) {
-            state.setCurrentPhase(
-                    state.getCurrentPhase() == TurnPhase.SETUP_PLACE_FIRST
-                            ? TurnPhase.SETUP_PLACE_FIRST
-                            : TurnPhase.SETUP_PLACE_SECOND
-            );
-        }
-
         checkVictoryCondition();
     }
 
     public void buildPipe(int pathId) {
         assert state.getCurrentPhase() == TurnPhase.TRADE_BUILD
-                || state.getCurrentPhase() == TurnPhase.SETUP_PLACE_FIRST
-                || state.getCurrentPhase() == TurnPhase.SETUP_PLACE_SECOND
-                : "buildPipe() called in invalid phase: " + state.getCurrentPhase();
+                : "buildPipe() called outside TRADE_BUILD phase: " + state.getCurrentPhase();
         assert !state.isGameOver() : "buildPipe() called after game is over";
 
         Player player = state.getActivePlayer();
-        boolean isSetup = state.isSetupPhase();
         boolean isFreeRoad = freeRoadsRemaining > 0;
 
         buildValidator.validatePipePlacement(state.getBoard(), player, pathId, false, null);
 
-        if (!isSetup && !isFreeRoad) {
+        if (!isFreeRoad) {
+            if (!player.canAfford(model.building.BuildCost.PIPE.getAllCosts())) {
+                throw new InvalidBuildException("Not enough resources to build Pipe.");
+            }
             payBuildCost(player, model.building.BuildCost.PIPE);
         }
 

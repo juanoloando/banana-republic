@@ -223,6 +223,7 @@ public class GameRevisionController implements GameUICallback {
     private boolean diceRolled = false;
     private enum DiceRollMode { NONE, AUTOMATIC, MANUAL }
     private DiceRollMode diceRollMode = DiceRollMode.NONE;
+    private TurnPhase lastObservedPhase;
     private static final double DICE_SIZE   = 78.0;
     private static final double DICE_X1     = 608.0;  // position of die 1 on boardPane
     private static final double DICE_X2     = 700.0;  // position of die 2 on boardPane
@@ -506,12 +507,24 @@ public class GameRevisionController implements GameUICallback {
         updatePhaseDisplay(false);
         hidePopup();
         setupRollDiceWarning();
-        // Restore frozen timer if returning from Load Game screen (cancel)
-        if (GameSession.hasPausedGameTimer()) {
-            int saved = GameSession.getPausedTimerSeconds();
-            activePlayerIndex = GameSession.getPausedActivePlayerIndex();
+        boolean hasPausedTimer = GameSession.hasPausedGameTimer();
+        int pausedSeconds = hasPausedTimer ? GameSession.getPausedTimerSeconds() : -1;
+        int pausedPlayerIdx = hasPausedTimer ? GameSession.getPausedActivePlayerIndex() : 0;
+        if (hasPausedTimer) {
             GameSession.clearPausedGameTimer();
-            startTurnTimer(saved);
+        }
+
+        if (gameController != null) {
+            activePlayerIndex = gameController.getCurrentPlayerIdx();
+            updateTurnDisplay(gameController.getActivePlayer().getName());
+            onPhaseChanged(gameController.getCurrentPhase());
+            if (hasPausedTimer && gameController.getCurrentPhase() == TurnPhase.TRADE_BUILD) {
+                activePlayerIndex = pausedPlayerIdx;
+                startTurnTimer(pausedSeconds);
+            }
+        } else if (hasPausedTimer) {
+            activePlayerIndex = pausedPlayerIdx;
+            startTurnTimer(pausedSeconds);
         } else {
             startTurnTimer(DEFAULT_TURN_SECONDS);
         }
@@ -548,8 +561,7 @@ public class GameRevisionController implements GameUICallback {
     }
 
     private boolean isBuyExperimentAllowedPhase() {
-        // TODO: connect to real phase state from bridge/engine.
-        return true;
+        return isTradeBuildPhase();
     }
 
     private boolean applyBuyExperimentCardCost() {
@@ -577,8 +589,7 @@ public class GameRevisionController implements GameUICallback {
     }
 
     private boolean isManualDiceAllowedPhase() {
-        // TODO: connect to real phase state from bridge/engine.
-        return true;
+        return isRollDicePhase() && diceRollMode == DiceRollMode.NONE && canRollDiceNow();
     }
 
     private void setupDeclareVictoryOverlay() {
@@ -3804,6 +3815,7 @@ public class GameRevisionController implements GameUICallback {
     }
 
     private void rollDiceRandom() {
+        if (!ensureDiceRollAllowed()) return;
         if (diceRollMode != DiceRollMode.NONE) {
             showDiceRollMethodBlockedInfo(false);
             return;
@@ -3815,6 +3827,7 @@ public class GameRevisionController implements GameUICallback {
     }
 
     private void rollDiceWithValues(int dice1, int dice2) {
+        if (!ensureDiceRollAllowed()) return;
         if (diceRollMode != DiceRollMode.NONE) {
             showDiceRollMethodBlockedInfo(true);
             return;
@@ -3856,9 +3869,11 @@ public class GameRevisionController implements GameUICallback {
             try {
                 gameController.rollDice();
             } catch (Exception e) {
+                diceRolled = false;
+                diceRollMode = DiceRollMode.NONE;
                 appendLog("Error roll dadu: " + e.getMessage());
-                // Fallback: UI-only mode
-                applyDiceRollUIFallback();
+                showInformationPopup("You must complete initial placement before rolling dice.",
+                        InformationCloseAction.RETURN_TO_GAME);
             }
         } else {
             // Tidak ada engine → UI-only fallback
@@ -3884,8 +3899,11 @@ public class GameRevisionController implements GameUICallback {
         if (gameController != null) {
             if (manual) gameController.setManualDice(f1, f2);
             try { gameController.rollDice(); } catch (Exception e) {
+                diceRolled = false;
+                diceRollMode = DiceRollMode.NONE;
                 appendLog("Error: " + e.getMessage());
-                tryAutoEnterBuildMode();
+                showInformationPopup("You must complete initial placement before rolling dice.",
+                        InformationCloseAction.RETURN_TO_GAME);
             }
         } else {
             tryAutoEnterBuildMode();
@@ -4210,9 +4228,15 @@ public class GameRevisionController implements GameUICallback {
     }
 
     private void performActualBuild() {
+        BuildType confirmedBuildType = pendingBuildType;
         if (gameController != null) {
             // ── Sambungkan ke engine — engine akan fire onBuildingPlaced/onPipePlaced ──
             try {
+                if (isInitialSetupPhase() && confirmedBuildType == BuildType.LAB) {
+                    showInformationPopup("Complete initial setup first.", InformationCloseAction.RETURN_TO_GAME);
+                    hideBuildPopup();
+                    return;
+                }
                 switch (pendingBuildType) {
                     case OUTPOST -> gameController.buildSettlement(pendingBuildId);
                     case LAB     -> gameController.upgradeLaboratory(pendingBuildId);
@@ -4230,7 +4254,9 @@ public class GameRevisionController implements GameUICallback {
                 }
                 // Jangan render manual — engine akan fire onBuildingPlaced/onPipePlaced
             } catch (Exception e) {
-                appendLog("❌ Build gagal: " + e.getMessage());
+                String friendlyMessage = mapBuildErrorMessage(e.getMessage());
+                appendLog("Build gagal: " + friendlyMessage);
+                showInformationPopup(friendlyMessage, InformationCloseAction.RETURN_TO_GAME);
                 hideBuildPopup();
                 return;
             }
@@ -4248,8 +4274,39 @@ public class GameRevisionController implements GameUICallback {
             }
         }
         hideBuildPopup();
+        if (gameController != null && isInitialSetupPhase()) {
+            exitBuildMode();
+            return;
+        }
         exitBuildMode();
         tryAutoEnterBuildMode();
+    }
+
+    private String mapBuildErrorMessage(String rawMessage) {
+        if (rawMessage == null || rawMessage.isBlank()) return "Build action failed.";
+
+        String message = rawMessage.toLowerCase(Locale.ROOT);
+        if (message.contains("already occupied")) return "This intersection is already occupied.";
+        if (message.contains("nearby intersections")) return "Cannot build here. Nearby intersections must be empty.";
+        if (message.contains("watch post must connect")) return "Watch Post must connect to your Pipe.";
+        if (message.contains("path already has a pipe") || message.contains("already has a pipe")) {
+            return "This path already has a Pipe.";
+        }
+        if (message.contains("pipe must connect to your existing pipe")) {
+            return "Pipe must connect to your existing Pipe, Watch Post, or Laboratory.";
+        }
+        if (message.contains("initial pipe must connect")) {
+            return "Initial Pipe must connect to your newly placed Watch Post.";
+        }
+        if (message.contains("cannot afford build cost: settlement")
+                || message.contains("not enough resources to build watch post")) {
+            return "Not enough resources to build Watch Post.";
+        }
+        if (message.contains("cannot afford build cost: pipe")
+                || message.contains("not enough resources to build pipe")) {
+            return "Not enough resources to build Pipe.";
+        }
+        return rawMessage;
     }
 
     // ── Building / pipe rendering ─────────────────────────────────────
@@ -4630,6 +4687,10 @@ public class GameRevisionController implements GameUICallback {
     // ── Button handlers ──────────────────────────────────────────────`r`n    @FXML
         @FXML
     private void onDiceButtonMouseClicked(MouseEvent event) {
+        if (!ensureDiceRollAllowed()) {
+            event.consume();
+            return;
+        }
         if (event.getButton() == MouseButton.SECONDARY) {
             event.consume();
             System.out.println("Dice button right clicked: manual roll popup");
@@ -4657,25 +4718,37 @@ public class GameRevisionController implements GameUICallback {
 
     @Override
     public void onPhaseChanged(TurnPhase newPhase) {
+        TurnPhase previousPhase = lastObservedPhase;
+        lastObservedPhase = newPhase;
+        if (diceButton != null) {
+            diceButton.setDisable(newPhase != TurnPhase.ROLL_DICE);
+        }
+
         switch (newPhase) {
             case ROLL_DICE -> {
+                stopTimer();
                 updatePhaseDisplay(false);
                 diceRolled = false;
+                diceRollMode = DiceRollMode.NONE;
                 exitBuildMode();
-                // Timer TIDAK dimulai di sini — mulai setelah TRADE_BUILD
+                if (previousPhase == TurnPhase.SETUP_PLACE_SECOND) {
+                    appendLog("Initial setup complete. Normal turns begin.");
+                    if (gameController != null) {
+                        appendLog(gameController.getActivePlayer().getName() + " may now roll the dice.");
+                    }
+                }
             }
             case TRADE_BUILD -> {
                 updatePhaseDisplay(true);
                 tryAutoEnterBuildMode();
-                startTurnTimer(DEFAULT_TURN_SECONDS); // Timer mulai setelah dice → TRADE_BUILD
+                startTurnTimer(DEFAULT_TURN_SECONDS);
             }
             case ROBBER_DISCARD -> {
                 stopTimer();
                 openDiscardDialogSequence();
             }
             case ROBBER_MOVE -> {
-                // Board klik untuk pindahkan robber — TODO: aktifkan mode klik tile
-                appendLog("⚠ Pindahkan Nimon Ungu ke tile lain.");
+                appendLog("Move Nimon Ungu to another tile.");
             }
             case GAME_OVER -> {
                 stopTimer();
@@ -4683,12 +4756,26 @@ public class GameRevisionController implements GameUICallback {
                     declareVictoryOverlayController.showDeclareVictoryScreen();
                 }
             }
-            case SETUP_PLACE_FIRST, SETUP_PLACE_SECOND -> {
-                // Distance rule berlaku sejak setup
+            case SETUP_PLACE_FIRST -> {
+                stopTimer();
+                diceRolled = false;
+                diceRollMode = DiceRollMode.NONE;
+                if (previousPhase != TurnPhase.SETUP_PLACE_FIRST) {
+                    appendLog("Initial setup started.");
+                }
+                enterSetupIntersectionMode();
+            }
+            case SETUP_PLACE_SECOND -> {
+                stopTimer();
+                diceRolled = false;
+                diceRollMode = DiceRollMode.NONE;
+                if (previousPhase != TurnPhase.SETUP_PLACE_SECOND) {
+                    appendLog("Second setup round started.");
+                }
                 enterSetupIntersectionMode();
             }
         }
-        appendLog("[Phase] → " + newPhase);
+        appendLog("[Phase] -> " + newPhase);
     }
 
     @Override
@@ -4718,7 +4805,11 @@ public class GameRevisionController implements GameUICallback {
         String type = buildingType.toLowerCase().contains("lab") ? "lab" : "pos";
         renderBuildingOnMap(intersectionId, type, colorName);
         refreshPlayerStatsAll();
-        appendLog("🏠 " + player.getName() + " membangun " + buildingType);
+        appendLog(player.getName() + " built " + buildingType + ".");
+        if (gameController != null && isInitialSetupPhase() && !"lab".equals(type)) {
+            setupLastSettlementId = intersectionId;
+            enterSetupPipeMode(intersectionId);
+        }
     }
 
     @Override
@@ -4844,11 +4935,11 @@ public class GameRevisionController implements GameUICallback {
     private void enterSetupIntersectionMode() {
         if (gameController == null || currentBoard == null) return;
         Player p = gameController.getActivePlayer();
-        // Distance rule BERLAKU sejak setup
         Set<Integer> validIds = gameController.getValidSettlementIds(p);
         enterBuildMode(validIds, java.util.Collections.emptySet(),
                        java.util.Collections.emptySet(), currentBoard);
-        appendLog("[Setup] Tempatkan Pos Pantau.");
+        boolean firstRound = gameController.getCurrentPhase() == TurnPhase.SETUP_PLACE_FIRST;
+        appendLog(p.getName() + ": place your " + (firstRound ? "first" : "second") + " Watch Post.");
     }
 
     /** Setup pipe mode — hanya path adjacent ke settlement yang baru ditempatkan. */
@@ -4858,7 +4949,9 @@ public class GameRevisionController implements GameUICallback {
         Set<Integer> pipePaths = gameController.getValidPipeIds(p, adjacentIntersectionId);
         enterBuildMode(java.util.Collections.emptySet(), java.util.Collections.emptySet(),
                        pipePaths, currentBoard);
-        appendLog("[Setup] Tempatkan Pipa adjacent ke pos baru.");
+        boolean firstRound = gameController.getCurrentPhase() == TurnPhase.SETUP_PLACE_FIRST;
+        appendLog(p.getName() + ": place a Pipe connected to your "
+                + (firstRound ? "first" : "second") + " Watch Post.");
     }
 
     /** Discard sequence — loop SEMUA player dengan >7 kartu. */
@@ -4938,8 +5031,51 @@ public class GameRevisionController implements GameUICallback {
         showCenteredWarning("Roll Dadu Terlebih Dahulu!", 1500);
     }
 
-    /** Returns true if the action can proceed; shows warning and returns false otherwise. */
+    private boolean isInitialSetupPhase() {
+        if (gameController == null) return false;
+        TurnPhase phase = gameController.getCurrentPhase();
+        return phase == TurnPhase.SETUP_PLACE_FIRST || phase == TurnPhase.SETUP_PLACE_SECOND;
+    }
+
+    private boolean isRollDicePhase() {
+        if (gameController == null) return !diceRolled;
+        return gameController.getCurrentPhase() == TurnPhase.ROLL_DICE;
+    }
+
+    private boolean isTradeBuildPhase() {
+        if (gameController == null) return diceRolled;
+        return gameController.getCurrentPhase() == TurnPhase.TRADE_BUILD;
+    }
+
+    private boolean ensureDiceRollAllowed() {
+        if (isInitialSetupPhase()) {
+            showInformationPopup("You must complete initial placement before rolling dice.",
+                    InformationCloseAction.RETURN_TO_GAME);
+            return false;
+        }
+        if (!isRollDicePhase()) {
+            showInformationPopup("Dice can only be rolled in Roll Dice phase.",
+                    InformationCloseAction.RETURN_TO_GAME);
+            return false;
+        }
+        return true;
+    }
+
+    private boolean requireTradeBuildAction() {
+        if (isInitialSetupPhase()) {
+            showInformationPopup("Complete initial setup first.", InformationCloseAction.RETURN_TO_GAME);
+            return false;
+        }
+        if (!isTradeBuildPhase()) {
+            showInformationPopup("Action is only available during Trade/Build phase.",
+                    InformationCloseAction.RETURN_TO_GAME);
+            return false;
+        }
+        return true;
+    }
+
     private boolean requireDiceRolled() {
+        if (!requireTradeBuildAction()) return false;
         if (!diceRolled) {
             showRollDiceWarning();
             return false;

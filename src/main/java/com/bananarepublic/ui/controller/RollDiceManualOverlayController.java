@@ -135,7 +135,7 @@ public class RollDiceManualOverlayController {
     @FXML
     private void onRollDiceClicked() {
         if (!phaseAllowedSupplier.get()) {
-            showError("You can only roll manually during Trade/Build phase.");
+            showError("You can only roll manually during Roll Dice phase.");
             return;
         }
         Integer d1 = dice1ComboBox == null ? null : dice1ComboBox.getValue();

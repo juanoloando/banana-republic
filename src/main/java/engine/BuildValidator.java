@@ -23,7 +23,7 @@ public class BuildValidator {
 
         if (!intersection.isEmpty()) {
             throw new InvalidBuildException(
-                    "Intersection " + intersectionId + " is already occupied");
+                    "This intersection is already occupied.");
         }
 
         checkDistanceRule(board, intersectionId);
@@ -88,7 +88,7 @@ public class BuildValidator {
                         "Path " + pathId + " does not exist"));
 
         if (!path.isEmpty()) {
-            throw new InvalidBuildException("Path " + pathId + " already has a pipe");
+            throw new InvalidBuildException("This path already has a Pipe.");
         }
 
         if (player instanceof HumanPlayer) {
@@ -104,8 +104,7 @@ public class BuildValidator {
                     path.connectsTo(setupIntersectionId);
             if (!touchesSetupSettlement) {
                 throw new InvalidBuildException(
-                        "During setup, pipe must be adjacent to the settlement just placed "
-                                + "(intersection " + setupIntersectionId + ")");
+                        "Initial Pipe must connect to your newly placed Watch Post.");
             }
         } else {
             checkPipeConnectivity(board, player, pathId);
@@ -117,8 +116,7 @@ public class BuildValidator {
         for (Intersection neighbor : neighbors) {
             if (!neighbor.isEmpty()) {
                 throw new InvalidBuildException(
-                        "Distance rule violated: intersection " + neighbor.getId()
-                                + " adjacent to " + intersectionId + " is already occupied");
+                        "Cannot build here. Nearby intersections must be empty.");
             }
         }
     }
@@ -129,8 +127,7 @@ public class BuildValidator {
                 .anyMatch(p -> p.isOwnedBy(player.getName()));
         if (!connected) {
             throw new InvalidBuildException(
-                    "Settlement must be connected to at least one of your Pipes "
-                            + "(intersection " + intersectionId + ")");
+                    "Watch Post must connect to your Pipe.");
         }
     }
 
@@ -146,8 +143,7 @@ public class BuildValidator {
 
         if (!connectedAtA && !connectedAtB) {
             throw new InvalidBuildException(
-                    "Pipe must connect to an existing Pipe, Settlement, or Laboratory "
-                            + "owned by " + player.getName());
+                    "Pipe must connect to your existing Pipe, Watch Post, or Laboratory.");
         }
     }
 
