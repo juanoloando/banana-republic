@@ -99,6 +99,7 @@ public class GameController extends GameEngineAdapter {
     public List<Player> getPlayersRequiredToDiscard()  { return engine.getPlayersRequiredToDiscard(); }
     public int computeDiscardCount(Player p)           { return engine.computeDiscardCount(p); }
     public boolean isCardPlayedThisTurn()              { return engine.isCardPlayedThisTurn(); }
+    public int getFreeRoadsRemaining()                 { return engine.getFreeRoadsRemaining(); }
     public DiceResult getLastDiceResult()              { return engine.getLastDiceResult(); }
 
     /** Save current game state to JSON file. Returns true on success. */
