@@ -90,6 +90,11 @@ public class LoadGameController {
             GameSession.setLoadedSaveData(saveData);
             GameSession.clearPausedGameTimer(); // new game load → no frozen timer
 
+            // Buat GameEngine dari save data agar phase events bisa di-fire
+            com.bananarepublic.controller.GameController gc =
+                com.bananarepublic.GameFactory.buildFromSave(saveData);
+            GameSession.setGameController(gc);
+
             System.out.println("Load game from: " + selectedFile.getAbsolutePath());
             System.out.println("Loaded players: " + loadedNamesFromSave);
 
