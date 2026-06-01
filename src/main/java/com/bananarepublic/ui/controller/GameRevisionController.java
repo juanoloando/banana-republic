@@ -566,10 +566,22 @@ public class GameRevisionController implements GameUICallback {
     }
 
     private boolean applyBuyExperimentCardCost() {
+        if (gameController != null) {
+            try {
+                gameController.buyExperimentCard();
+                // Engine fires onCardBought callback → refreshes inventory + stats
+                syncAllPlayerStocksFromEngine();
+                initializeBankTradeDummyData();
+                return true;
+            } catch (Exception e) {
+                appendLog("Cannot buy card: " + e.getMessage());
+                return false;
+            }
+        }
+        // Fallback: no engine — update local stocks only
         if (getResourceAmount(activePlayerIndex, ResourceType.ORE) < 1) return false;
         if (getResourceAmount(activePlayerIndex, ResourceType.BANANA) < 1) return false;
         if (getResourceAmount(activePlayerIndex, ResourceType.WHEAT) < 1) return false;
-
         addResourceAmount(activePlayerIndex, ResourceType.ORE, -1);
         addResourceAmount(activePlayerIndex, ResourceType.BANANA, -1);
         addResourceAmount(activePlayerIndex, ResourceType.WHEAT, -1);
@@ -5223,13 +5235,19 @@ public class GameRevisionController implements GameUICallback {
 
     @Override
     public void onCardBought(Player player, ExperimentCard card) {
-        if (gameController != null && player == gameController.getActivePlayer()) {
+        if (gameController != null) {
+            // Refresh the buying player's inventory
+            int buyerIdx = getAllPlayerIndex(player);
+            if (buyerIdx == activePlayerIndex) {
+                refreshInventoryForPlayerIndex(activePlayerIndex);
+            }
+        } else if (player != null) {
             refreshExperimentInventory(
                 countCards(player, model.card.CardCategory.KNIGHT),
                 countCards(player, model.card.CardCategory.PROGRESS),
                 countCards(player, model.card.CardCategory.VICTORY_POINT));
         }
-        refreshPlayerStatsAll();
+        refreshPlayerStatsAllFromEngine();
         appendLog("🃏 " + player.getName() + " membeli kartu eksperimen.");
     }
 
@@ -5286,10 +5304,41 @@ public class GameRevisionController implements GameUICallback {
     }
 
     private void refreshPlayerStatsAll() {
+        refreshPlayerStatsAllFromEngine();
+    }
+
+    private void refreshPlayerStatsAllFromEngine() {
         if (gameController == null) return;
-        SaveData sd = GameSession.getLoadedSaveData();
-        if (sd != null) populatePlayerStats(sd);
-        // TODO: populate dari engine state langsung saat fully integrated
+        List<model.player.Player> players = gameController.getAllPlayers();
+        Label[][] statLabels = {
+            {player1VpLabel, player1OutpostLabel, player1LabLabel, player1KnightLabel, player1PipeLabel},
+            {player2VpLabel, player2OutpostLabel, player2LabLabel, player2KnightLabel, player2PipeLabel},
+            {player3VpLabel, player3OutpostLabel, player3LabLabel, player3KnightLabel, player3PipeLabel},
+            {player4VpLabel, player4OutpostLabel, player4LabLabel, player4KnightLabel, player4PipeLabel},
+        };
+        int limit = Math.min(players.size(), 4);
+        for (int i = 0; i < limit; i++) {
+            model.player.Player p = players.get(i);
+            int outposts = 0, labs = 0, pipes = 0;
+            if (p instanceof model.player.HumanPlayer hp) {
+                outposts = model.player.HumanPlayer.MAX_SETTLEMENTS - hp.getSettlementsInSupply();
+                labs     = model.player.HumanPlayer.MAX_LABORATORIES - hp.getLaboratoriesInSupply();
+                pipes    = model.player.HumanPlayer.MAX_PIPES - hp.getPipesInSupply();
+            }
+            int vp     = gameController.computeVictoryPoints(p);
+            int knight = countCards(p, model.card.CardCategory.KNIGHT);
+            Label[] row = statLabels[i];
+            if (row[0] != null) row[0].setText(String.valueOf(vp));
+            if (row[1] != null) row[1].setText(String.valueOf(outposts));
+            if (row[2] != null) row[2].setText(String.valueOf(labs));
+            if (row[3] != null) row[3].setText(String.valueOf(knight));
+            if (row[4] != null) row[4].setText(String.valueOf(pipes));
+            playerVictoryPointsCache[i] = vp;
+            refreshPlayerStatusCards(i + 1,
+                countCards(p, model.card.CardCategory.KNIGHT),
+                countCards(p, model.card.CardCategory.PROGRESS),
+                countCards(p, model.card.CardCategory.VICTORY_POINT));
+        }
     }
 
     /** Setup mode saat fase SETUP — intersection dulu (distance rule berlaku). */
@@ -5705,7 +5754,138 @@ public class GameRevisionController implements GameUICallback {
 
     @FXML
     private void onSaveClicked() {
-        /* TODO: connect to SaveLoadService */
+        showSavePluginDialog();
+    }
+
+    private void showSavePluginDialog() {
+        StackPane overlay = new StackPane();
+        overlay.setStyle("-fx-background-color: rgba(0,0,0,0.60);");
+        overlay.prefWidthProperty().bind(rootPane.widthProperty());
+        overlay.prefHeightProperty().bind(rootPane.heightProperty());
+        overlay.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
+        VBox dialog = new VBox(20);
+        dialog.setMaxWidth(420);
+        dialog.setStyle("-fx-background-color: #f5e8c8; -fx-border-color: #7a4a23; "
+            + "-fx-border-width: 3; -fx-padding: 28; -fx-background-radius: 14; -fx-border-radius: 14;");
+        dialog.setAlignment(Pos.CENTER);
+
+        Label title = new Label("Settings & Plugins");
+        title.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #2f2010;");
+
+        // ── Save Game ─────────────────────────────
+        VBox saveSection = buildSaveSection(overlay);
+
+        // ── Load Card Plugin ───────────────────────
+        VBox pluginSection = buildPluginSection(overlay);
+
+        Button cancelBtn = new Button("Close");
+        cancelBtn.setStyle("-fx-background-color: #a09080; -fx-text-fill: white; "
+            + "-fx-font-size: 13px; -fx-pref-width: 140; -fx-pref-height: 38; -fx-background-radius: 8;");
+        cancelBtn.setOnAction(e -> rootPane.getChildren().remove(overlay));
+
+        dialog.getChildren().addAll(title, saveSection, pluginSection, cancelBtn);
+        StackPane.setAlignment(dialog, Pos.CENTER);
+        overlay.getChildren().add(dialog);
+        rootPane.getChildren().add(overlay);
+        overlay.toFront();
+    }
+
+    private VBox buildSaveSection(StackPane overlay) {
+        VBox section = new VBox(8);
+        section.setStyle("-fx-background-color: #ece0c0; -fx-padding: 14; -fx-background-radius: 10;");
+        section.setAlignment(Pos.CENTER_LEFT);
+
+        Label sectionTitle = new Label("Save Current Game");
+        sectionTitle.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2f2010;");
+
+        Label sectionDesc = new Label("Save game state as JSON to resume later.");
+        sectionDesc.setStyle("-fx-font-size: 12px; -fx-text-fill: #5b2e0a;");
+        sectionDesc.setWrapText(true);
+
+        Button saveBtn = new Button("SAVE STATE");
+        saveBtn.setStyle("-fx-background-color: #7a4a23; -fx-text-fill: white; -fx-font-size: 13px; "
+            + "-fx-font-weight: bold; -fx-pref-width: 180; -fx-pref-height: 38; -fx-background-radius: 8;");
+        saveBtn.setDisable(gameController == null);
+        saveBtn.setOnAction(e -> {
+            if (gameController == null) return;
+            rootPane.getChildren().remove(overlay);
+            performSaveGame();
+        });
+
+        section.getChildren().addAll(sectionTitle, sectionDesc, saveBtn);
+        return section;
+    }
+
+    private void performSaveGame() {
+        javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+        chooser.setTitle("Save Game");
+        chooser.getExtensionFilters().add(
+            new javafx.stage.FileChooser.ExtensionFilter("JSON Save Files", "*.json")
+        );
+        chooser.setInitialFileName("banana_republic_save.json");
+        javafx.stage.Window window = rootPane.getScene() != null ? rootPane.getScene().getWindow() : null;
+        java.io.File file = chooser.showSaveDialog(window);
+        if (file != null) {
+            boolean ok = gameController.saveGame(file);
+            if (ok) {
+                appendLog("Game saved: " + file.getName());
+                showInformationPopup("Game saved to " + file.getName() + ".",
+                    InformationCloseAction.RETURN_TO_GAME);
+            } else {
+                showInformationPopup("Save failed. Please try again.",
+                    InformationCloseAction.RETURN_TO_GAME);
+            }
+        }
+    }
+
+    private VBox buildPluginSection(StackPane overlay) {
+        VBox section = new VBox(8);
+        section.setStyle("-fx-background-color: #ece0c0; -fx-padding: 14; -fx-background-radius: 10;");
+        section.setAlignment(Pos.CENTER_LEFT);
+
+        Label sectionTitle = new Label("Load Card Plugin (.jar)");
+        sectionTitle.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2f2010;");
+
+        Label sectionDesc = new Label("Add new Experiment Cards from a plugin JAR.");
+        sectionDesc.setStyle("-fx-font-size: 12px; -fx-text-fill: #5b2e0a;");
+        sectionDesc.setWrapText(true);
+
+        Label statusLabel = new Label("");
+        statusLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #1a8917;");
+        statusLabel.setWrapText(true);
+
+        Button browseBtn = new Button("BROWSE FILES");
+        browseBtn.setStyle("-fx-background-color: #3a7a3a; -fx-text-fill: white; -fx-font-size: 13px; "
+            + "-fx-font-weight: bold; -fx-pref-width: 180; -fx-pref-height: 38; -fx-background-radius: 8;");
+        browseBtn.setDisable(gameController == null);
+        browseBtn.setOnAction(e -> {
+            if (gameController == null) return;
+            javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+            chooser.setTitle("Load Card Plugin");
+            chooser.getExtensionFilters().add(
+                new javafx.stage.FileChooser.ExtensionFilter("JAR Plugin Files", "*.jar")
+            );
+            javafx.stage.Window window = rootPane.getScene() != null ? rootPane.getScene().getWindow() : null;
+            java.io.File jarFile = chooser.showOpenDialog(window);
+            if (jarFile != null) {
+                try {
+                    gameController.injectCardPlugin(jarFile);
+                    String msg = "Plugin loaded: " + jarFile.getName();
+                    statusLabel.setText(msg);
+                    statusLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #1a8917;");
+                    appendLog("🔌 " + msg);
+                } catch (Exception ex) {
+                    String msg = "Plugin load failed: " + ex.getMessage();
+                    statusLabel.setText(msg);
+                    statusLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #b7261e;");
+                    appendLog("❌ " + msg);
+                }
+            }
+        });
+
+        section.getChildren().addAll(sectionTitle, sectionDesc, browseBtn, statusLabel);
+        return section;
     }
 
     @FXML

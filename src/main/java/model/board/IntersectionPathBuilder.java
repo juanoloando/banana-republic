@@ -83,7 +83,15 @@ class IntersectionPathBuilder {
                 String edgeKey = idMin + ":" + idMax;
                 if (!seenEdges.add(edgeKey)) continue;
 
-                paths.add(new BoardPath(idCounter[0]++, intA.getId(), intB.getId()));
+                int pathId = idCounter[0]++;
+                BoardPath path = new BoardPath(pathId, intA.getId(), intB.getId());
+                paths.add(path);
+
+                // Wire adjacency: each endpoint knows about this path and about each other
+                intA.addAdjacentPathId(pathId);
+                intB.addAdjacentPathId(pathId);
+                intA.addAdjacentIntersectionId(intB.getId());
+                intB.addAdjacentIntersectionId(intA.getId());
             }
         }
 
