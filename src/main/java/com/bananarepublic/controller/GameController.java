@@ -1,7 +1,6 @@
 package com.bananarepublic.controller;
 
 import engine.*;
-import engine.exception.InvalidActionException;
 import javafx.application.Platform;
 import model.board.Board;
 import model.board.BoardPath;
