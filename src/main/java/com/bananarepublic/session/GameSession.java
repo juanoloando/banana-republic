@@ -3,6 +3,7 @@ package com.bananarepublic.session;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.bananarepublic.controller.GameController;
 import persistence.SaveData;
 
 public class GameSession {
@@ -37,6 +38,14 @@ public class GameSession {
     public static void clearLoadedSaveData() {
         loadedSaveData = null;
     }
+
+    // ── GameController (bridge layer) ─────────────────────────────────
+
+    private static GameController gameController;
+
+    public static void setGameController(GameController gc)  { gameController = gc; }
+    public static GameController getGameController()         { return gameController; }
+    public static void clearGameController()                 { gameController = null; }
 
     // ── Timer pause/resume across scene switches ──────────────────────
 

@@ -1,8 +1,12 @@
 package com.bananarepublic.ui.controller;
 
 import com.bananarepublic.BananaRepublic;
+import com.bananarepublic.controller.GameController;
+import com.bananarepublic.controller.GameUICallback;
 import com.bananarepublic.session.GameSession;
 import com.bananarepublic.ui.renderer.HexRevisionRenderer;
+import engine.DiceResult;
+import engine.TurnPhase;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -25,6 +29,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import model.board.*;
 import model.card.CardCategory;
+import model.card.ExperimentCard;
 import model.player.Player;
 import model.resource.ResourceType;
 import persistence.SaveData;
@@ -37,7 +42,7 @@ import java.util.function.Predicate;
 
 import java.util.*;
 
-public class GameRevisionController {
+public class GameRevisionController implements GameUICallback {
 
     private static final double DESIGN_WIDTH  = 1920.0;
     private static final double DESIGN_HEIGHT = 1080.0;
@@ -173,6 +178,9 @@ public class GameRevisionController {
     @FXML private Button    selectOutpostButton;
 
     // ── State ─────────────────────────────────────────────────────────
+    // ── Bridge layer ──────────────────────────────────────────────────
+    private GameController gameController;
+
     private final HexRevisionRenderer hexRevisionRenderer = new HexRevisionRenderer();
     private final Map<ResourceType, Label> resourceBadgeLabels = new EnumMap<>(ResourceType.class);
 
@@ -184,8 +192,9 @@ public class GameRevisionController {
 
     // Build mode state
     private enum BuildType { NONE, OUTPOST, LAB, PIPE }
-    private BuildType pendingBuildType    = BuildType.NONE;
-    private int       pendingBuildId      = -1;
+    private BuildType pendingBuildType      = BuildType.NONE;
+    private int       pendingBuildId        = -1;
+    private int       setupLastSettlementId = -1; // setup phase: ID settlement terakhir
     // Selection in building popup: null = belum dipilih, "lab" atau "outpost"
     private String    pendingBuildingSubType = null;
     private Timeline  buildingSelectErrorTimeline;
@@ -472,6 +481,12 @@ public class GameRevisionController {
     // ── Lifecycle ────────────────────────────────────────────────────
     @FXML
     public void initialize() {
+        // Wire bridge layer — harus sebelum apapun yang butuh gameController
+        gameController = GameSession.getGameController();
+        if (gameController != null) {
+            gameController.setUiCallback(this);
+        }
+
         setupResponsiveScaling();
         setupTradeModalRoot();
         setupBuyExperimentOverlay();
@@ -954,7 +969,7 @@ public class GameRevisionController {
         Label nameLabel = new Label(resourceDisplayName(type));
         nameLabel.getStyleClass().add("gr-resource-name");
         if (arcadeFont != null) nameLabel.setFont(Font.font(arcadeFont.getFamily(), 10));
-        nameLabel.setStyle("-fx-text-fill: #f5e8c0; -fx-font-weight: bold;");
+        nameLabel.setStyle("-fx-text-fill: #5b2e0a; -fx-font-weight: bold;"); // coklat
 
         // Count badge — plain text, top-left, visible only when count > 1
         Label badge = new Label(count > 1 ? String.valueOf(count) : "");
@@ -975,7 +990,7 @@ public class GameRevisionController {
 
         // Count text at top-left
         StackPane.setAlignment(badge, Pos.TOP_LEFT);
-        badge.setTranslateX(5);  // horizontal offset from card left edge
+        badge.setTranslateX(8);  // horizontal offset from card left edge  ← geser kiri 3px (dari 5→2)
         badge.setTranslateY(4);  // vertical offset from card top edge
         root.getChildren().add(badge);
 
@@ -3834,23 +3849,47 @@ public class GameRevisionController {
     }
 
     private void finalizeDiceRoll() {
+        diceRolled = true;
+        if (gameController != null) {
+            // Engine rollDice() → fires onDiceRolled() callback → updates dice visuals + log
+            // Engine juga fires onPhaseChanged(ROBBER_DISCARD / TRADE_BUILD) → handles rest
+            try {
+                gameController.rollDice();
+            } catch (Exception e) {
+                appendLog("Error roll dadu: " + e.getMessage());
+                // Fallback: UI-only mode
+                applyDiceRollUIFallback();
+            }
+        } else {
+            // Tidak ada engine → UI-only fallback
+            applyDiceRollUIFallback();
+        }
+    }
+
+    /** Fallback saat tidak ada engine yang terhubung. */
+    private void applyDiceRollUIFallback() {
         int f1 = randomFace();
         int f2 = randomFace();
-        applyDiceRoll(f1, f2, false);
+        if (diceView1 != null) diceView1.setImage(loadDiceImage(f1));
+        if (diceView2 != null) diceView2.setImage(loadDiceImage(f2));
+        appendLog("🎲 " + f1 + " + " + f2 + " = " + (f1 + f2) + " (offline mode).");
+        tryAutoEnterBuildMode();
     }
+
     private void applyDiceRoll(int f1, int f2, boolean manual) {
         if (diceView1 != null) diceView1.setImage(loadDiceImage(f1));
         if (diceView2 != null) diceView2.setImage(loadDiceImage(f2));
-        if (manual) {
-            System.out.println("Manual dice rolled: " + f1 + " + " + f2 + " = " + (f1 + f2));
-            appendLog("Manual dice rolled: " + f1 + " + " + f2 + " = " + (f1 + f2) + ".");
+        appendLog((manual ? "Manual dice" : "Dice") + " rolled: "
+                  + f1 + " + " + f2 + " = " + (f1 + f2));
+        if (gameController != null) {
+            if (manual) gameController.setManualDice(f1, f2);
+            try { gameController.rollDice(); } catch (Exception e) {
+                appendLog("Error: " + e.getMessage());
+                tryAutoEnterBuildMode();
+            }
         } else {
-            appendLog("Dice rolled: " + f1 + " + " + f2 + " = " + (f1 + f2) + ".");
+            tryAutoEnterBuildMode();
         }
-        // TODO: notify bridge layer -> GameEngine.rollDice(f1, f2)
-
-        // Setelah dadu dilempar, tampilkan lokasi yang bisa dibangun
-        tryAutoEnterBuildMode();
     }
 
     private void showDiceRollMethodBlockedInfo(boolean manualRequested) {
@@ -4014,46 +4053,51 @@ public class GameRevisionController {
      * dengan data validasi nyata dari GameEngine.
      */
     private void tryAutoEnterBuildMode() {
-        // Build mode dipanggil setelah dice roll — tidak perlu cek phase dari save data
-        // (phase sudah efektif TRADE_BUILD karena dadu baru saja dilempar)
         if (currentBoard == null) return;
 
-        // Kumpulkan intersection valid untuk bangun outpost:
-        // adj >= 2: titik di mana 2 atau 3 tile bertemu (36 titik total)
-        // adj == 1 dikecualikan: sudut ekstrem board (hanya 1 tile, tidak valid)
-        Set<Integer> settlementIds = new HashSet<>();
-        Set<Integer> labIds        = new HashSet<>();
-        for (Intersection inter : currentBoard.getAllIntersections()) {
-            if (inter.getAdjacentTileCoords().size() < 2) continue;
+        Set<Integer> settlementIds;
+        Set<Integer> labIds;
+        Set<Integer> pipeIds;
 
-            if (inter.getBuilding().isEmpty()) {
-                settlementIds.add(inter.getId());
-            } else {
-                inter.getBuilding().ifPresent(b -> {
-                    // Jika sudah ada outpost milik pemain aktif → bisa upgrade ke lab
-                    String ownerName = b.getOwnerName();
-                    List<String> names = GameSession.getPlayerNames();
-                    if (!names.isEmpty() && ownerName.equals(names.get(activePlayerIndex))) {
-                        if ("Outpost".equalsIgnoreCase(b.getBuildingTypeName())
-                         || "OUTPOST".equalsIgnoreCase(b.getBuildingTypeName())) {
+        if (gameController != null) {
+            // ── Pakai BuildValidator via bridge — validasi nyata dari engine ──
+            // Distance rule, connectivity, lab-hanya-dari-outpost, resource check
+            TurnPhase phase = gameController.getCurrentPhase();
+            if (phase != TurnPhase.TRADE_BUILD
+                && phase != TurnPhase.SETUP_PLACE_FIRST
+                && phase != TurnPhase.SETUP_PLACE_SECOND) return;
+
+            Player activePlayer = gameController.getActivePlayer();
+            settlementIds = gameController.getValidSettlementIds(activePlayer);
+            labIds        = gameController.getValidLabIds(activePlayer);
+            pipeIds       = gameController.getValidPipeIds(activePlayer);
+        } else {
+            // ── Fallback offline: pakai semua lokasi kosong (tanpa validasi) ──
+            settlementIds = new HashSet<>();
+            labIds        = new HashSet<>();
+            for (Intersection inter : currentBoard.getAllIntersections()) {
+                if (inter.getAdjacentTileCoords().size() < 2) continue;
+                if (inter.getBuilding().isEmpty()) {
+                    settlementIds.add(inter.getId());
+                } else {
+                    inter.getBuilding().ifPresent(b -> {
+                        List<String> names = GameSession.getPlayerNames();
+                        if (!names.isEmpty()
+                            && b.getOwnerName().equals(names.get(activePlayerIndex))
+                            && !"Laboratorium".equalsIgnoreCase(b.getBuildingTypeName())) {
                             labIds.add(inter.getId());
                         }
-                    }
-                });
+                    });
+                }
             }
-        }
-
-        // Kumpulkan semua path kosong → bisa bangun pipe
-        Set<Integer> pipeIds = new HashSet<>();
-        for (BoardPath path : currentBoard.getAllPaths()) {
-            if (path.getPipe().isEmpty()) {
-                pipeIds.add(path.getId());
+            pipeIds = new HashSet<>();
+            for (BoardPath path : currentBoard.getAllPaths()) {
+                if (path.getPipe().isEmpty()) pipeIds.add(path.getId());
             }
         }
 
         appendLog("[Build] settlement=" + settlementIds.size()
-                + " lab=" + labIds.size()
-                + " pipe=" + pipeIds.size());
+                + " lab=" + labIds.size() + " pipe=" + pipeIds.size());
         enterBuildMode(settlementIds, labIds, pipeIds, currentBoard);
     }
 
@@ -4162,44 +4206,49 @@ public class GameRevisionController {
     }
 
     private void showBuildingSelectError() {
-        if (buildingSelectErrorLabel == null) return;
-        if (arcadeFont != null) buildingSelectErrorLabel.setFont(
-            javafx.scene.text.Font.font(arcadeFont.getFamily(), 11));
-        buildingSelectErrorLabel.setVisible(true);
-        buildingSelectErrorLabel.setManaged(true);
-        if (buildingSelectErrorTimeline != null) buildingSelectErrorTimeline.stop();
-        buildingSelectErrorTimeline = new Timeline(
-            new KeyFrame(Duration.millis(1500), e -> {
-                buildingSelectErrorLabel.setVisible(false);
-                buildingSelectErrorLabel.setManaged(false);
-            })
-        );
-        buildingSelectErrorTimeline.play();
+        showCenteredWarning("Klik icon bangunan terlebih dahulu", 1500, "#5b2e0a"); // coklat
     }
 
     private void performActualBuild() {
-        String colorName = getPlayerColorName(activePlayerIndex);
-        switch (pendingBuildType) {
-            case OUTPOST -> {
-                renderBuildingOnMap(pendingBuildId, "pos", colorName);
-                appendLog("⛺ Outpost dibangun di intersection " + pendingBuildId);
-                // TODO: GameEngine.buildSettlement(pendingBuildId)
+        if (gameController != null) {
+            // ── Sambungkan ke engine — engine akan fire onBuildingPlaced/onPipePlaced ──
+            try {
+                switch (pendingBuildType) {
+                    case OUTPOST -> gameController.buildSettlement(pendingBuildId);
+                    case LAB     -> gameController.upgradeLaboratory(pendingBuildId);
+                    case PIPE    -> {
+                        TurnPhase phase = gameController.getCurrentPhase();
+                        if (phase == TurnPhase.SETUP_PLACE_FIRST
+                            || phase == TurnPhase.SETUP_PLACE_SECOND) {
+                            // Setup pipe harus menyentuh settlement yang baru saja ditempatkan
+                            gameController.buildPipeSetup(pendingBuildId, setupLastSettlementId);
+                        } else {
+                            gameController.buildPipe(pendingBuildId);
+                        }
+                    }
+                    default -> {}
+                }
+                // Jangan render manual — engine akan fire onBuildingPlaced/onPipePlaced
+            } catch (Exception e) {
+                appendLog("❌ Build gagal: " + e.getMessage());
+                hideBuildPopup();
+                return;
             }
-            case LAB -> {
-                renderBuildingOnMap(pendingBuildId, "lab", colorName);
-                appendLog("🏛 Lab dibangun di intersection " + pendingBuildId);
-                // TODO: GameEngine.upgradeLaboratory(pendingBuildId)
+        } else {
+            // ── Fallback offline — render manual ──────────────────────────
+            String colorName = getPlayerColorName(activePlayerIndex);
+            switch (pendingBuildType) {
+                case OUTPOST -> { renderBuildingOnMap(pendingBuildId, "pos", colorName);
+                                  appendLog("⛺ Outpost dibangun (offline)."); }
+                case LAB     -> { renderBuildingOnMap(pendingBuildId, "lab", colorName);
+                                  appendLog("🏛 Lab dibangun (offline)."); }
+                case PIPE    -> { renderPipeOnMap(pendingBuildId, activePlayerIndex);
+                                  appendLog("🛣 Pipe dibangun (offline)."); }
+                default -> {}
             }
-            case PIPE -> {
-                renderPipeOnMap(pendingBuildId, activePlayerIndex);
-                appendLog("🛣 Pipe dibangun di path " + pendingBuildId);
-                // TODO: GameEngine.buildPipe(pendingBuildId)
-            }
-            default -> {}
         }
         hideBuildPopup();
         exitBuildMode();
-        // Re-enter build mode so remaining valid spots still show
         tryAutoEnterBuildMode();
     }
 
@@ -4603,40 +4652,290 @@ public class GameRevisionController {
         rollDiceRandom();
     }
 
-    // ── Phase gating ─────────────────────────────────────────────────
+    // ── GameUICallback implementation ────────────────────────────────
+    // Semua dipanggil dari GameController.Platform.runLater() → FX thread aman
 
-    private Label rollDiceWarningLabel;
-    private Timeline rollDiceWarningTimeline;
+    @Override
+    public void onPhaseChanged(TurnPhase newPhase) {
+        switch (newPhase) {
+            case ROLL_DICE -> {
+                updatePhaseDisplay(false);
+                diceRolled = false;
+                exitBuildMode();
+                // Timer TIDAK dimulai di sini — mulai setelah TRADE_BUILD
+            }
+            case TRADE_BUILD -> {
+                updatePhaseDisplay(true);
+                tryAutoEnterBuildMode();
+                startTurnTimer(DEFAULT_TURN_SECONDS); // Timer mulai setelah dice → TRADE_BUILD
+            }
+            case ROBBER_DISCARD -> {
+                stopTimer();
+                openDiscardDialogSequence();
+            }
+            case ROBBER_MOVE -> {
+                // Board klik untuk pindahkan robber — TODO: aktifkan mode klik tile
+                appendLog("⚠ Pindahkan Nimon Ungu ke tile lain.");
+            }
+            case GAME_OVER -> {
+                stopTimer();
+                if (declareVictoryOverlayController != null) {
+                    declareVictoryOverlayController.showDeclareVictoryScreen();
+                }
+            }
+            case SETUP_PLACE_FIRST, SETUP_PLACE_SECOND -> {
+                // Distance rule berlaku sejak setup
+                enterSetupIntersectionMode();
+            }
+        }
+        appendLog("[Phase] → " + newPhase);
+    }
 
-    /** Call once during initialize to create the warning overlay. */
+    @Override
+    public void onDiceRolled(DiceResult result) {
+        // Update visual dadu dengan hasil nyata dari engine
+        if (diceView1 != null) diceView1.setImage(loadDiceImage(result.getDie1()));
+        if (diceView2 != null) diceView2.setImage(loadDiceImage(result.getDie2()));
+        appendLog("🎲 " + result.getDie1() + " + " + result.getDie2()
+                  + " = " + result.getTotal()
+                  + (result.isRobberActivated() ? " 🔴 ROBBER!" : ""));
+    }
+
+    @Override
+    public void onTurnChanged(Player newActivePlayer) {
+        // Update UI — JANGAN startTurnTimer() di sini, timer mulai dari TRADE_BUILD
+        activePlayerIndex = gameController != null
+            ? gameController.getCurrentPlayerIdx() : (activePlayerIndex + 1) % playerCount;
+        updateTurnDisplay(newActivePlayer.getName());
+        refreshInventoryForPlayerIndex(activePlayerIndex);
+        appendLog("─── Giliran " + newActivePlayer.getName() + " ───");
+    }
+
+    @Override
+    public void onBuildingPlaced(Player player, int intersectionId, String buildingType) {
+        // Re-render bangunan di map dari data engine (bukan manual render di performActualBuild)
+        String colorName = getPlayerColorName(getAllPlayerIndex(player));
+        String type = buildingType.toLowerCase().contains("lab") ? "lab" : "pos";
+        renderBuildingOnMap(intersectionId, type, colorName);
+        refreshPlayerStatsAll();
+        appendLog("🏠 " + player.getName() + " membangun " + buildingType);
+    }
+
+    @Override
+    public void onPipePlaced(Player player, int pathId) {
+        renderPipeOnMap(pathId, getAllPlayerIndex(player));
+        refreshPlayerStatsAll();
+        appendLog("🛣 " + player.getName() + " membangun pipe");
+    }
+
+    @Override
+    public void onResourcesDistributed(Player activePlayer) {
+        // Refresh inventory untuk SEMUA player (resource berubah)
+        if (gameController != null) {
+            // Refresh active player inventory
+            refreshInventory(gameController.getActivePlayer());
+            refreshBankPanel(gameController.getBank());
+        }
+    }
+
+    @Override
+    public void onRobberMoved(HexCoordinate newPosition) {
+        // Re-render board dengan posisi robber baru
+        if (currentBoard != null) {
+            hexRevisionRenderer.render(boardPane,
+                currentBoard.getAllTiles(), newPosition, currentBoard);
+        }
+        // Jika ada kandidat curi
+        if (gameController != null && !gameController.getStealCandidates().isEmpty()) {
+            appendLog("⚔ Pilih pemain untuk dicuri resource-nya (atau abaikan).");
+            // TODO: Buka StealCardDialog saat tersedia
+        }
+    }
+
+    @Override
+    public void onResourcesDiscarded(Player player) {
+        if (gameController != null) {
+            refreshBankPanel(gameController.getBank());
+        }
+        appendLog("🗑 " + player.getName() + " membuang kartu resource.");
+    }
+
+    @Override
+    public void onResourceStolen(Player thief, Player victim, ResourceType stolenResource) {
+        appendLog("⚔ " + thief.getName() + " mencuri "
+                  + stolenResource.name().toLowerCase() + " dari " + victim.getName());
+        if (gameController != null) {
+            refreshInventory(gameController.getActivePlayer());
+        }
+    }
+
+    @Override
+    public void onCardBought(Player player, ExperimentCard card) {
+        if (gameController != null && player == gameController.getActivePlayer()) {
+            refreshExperimentInventory(
+                countCards(player, model.card.CardCategory.KNIGHT),
+                countCards(player, model.card.CardCategory.PROGRESS),
+                countCards(player, model.card.CardCategory.VICTORY_POINT));
+        }
+        refreshPlayerStatsAll();
+        appendLog("🃏 " + player.getName() + " membeli kartu eksperimen.");
+    }
+
+    @Override
+    public void onCardPlayed(Player player, ExperimentCard card) {
+        appendLog("▶ " + player.getName() + " memainkan " + card.getCardName());
+    }
+
+    @Override
+    public void onKnightPlayed(Player player) {
+        refreshPlayerStatsAll();
+        appendLog("⚔ " + player.getName() + " memainkan Knight card.");
+    }
+
+    @Override
+    public void onTimerTick(int secondsRemaining) {
+        // Engine timer mengoverride UI timer jika terhubung
+        remainingSeconds = secondsRemaining;
+        updateTimerDisplay();
+    }
+
+    @Override
+    public void onTimerExpired(Player playerWhoTimedOut) {
+        appendLog("⏱ Waktu habis untuk " + playerWhoTimedOut.getName());
+        performEndTurn();
+    }
+
+    @Override
+    public void onGameWon(Player winner) {
+        stopTimer();
+        appendLog("🏆 " + winner.getName() + " MENANG!");
+        if (declareVictoryOverlayController != null) {
+            declareVictoryOverlayController.showDeclareVictoryScreen();
+        }
+    }
+
+    // ── Helpers untuk GameUICallback ─────────────────────────────────
+
+    private int getAllPlayerIndex(Player player) {
+        if (gameController == null) return 0;
+        List<model.player.Player> all = gameController.getAllPlayers();
+        for (int i = 0; i < all.size(); i++) {
+            if (all.get(i).getName().equals(player.getName())) return i;
+        }
+        return 0;
+    }
+
+    private int countCards(Player player, model.card.CardCategory cat) {
+        if (player instanceof model.player.HumanPlayer) {
+            return ((model.player.HumanPlayer) player)
+                .getInventory().getCardsByCategory(cat).size();
+        }
+        return 0;
+    }
+
+    private void refreshPlayerStatsAll() {
+        if (gameController == null) return;
+        SaveData sd = GameSession.getLoadedSaveData();
+        if (sd != null) populatePlayerStats(sd);
+        // TODO: populate dari engine state langsung saat fully integrated
+    }
+
+    /** Setup mode saat fase SETUP — intersection dulu (distance rule berlaku). */
+    private void enterSetupIntersectionMode() {
+        if (gameController == null || currentBoard == null) return;
+        Player p = gameController.getActivePlayer();
+        // Distance rule BERLAKU sejak setup
+        Set<Integer> validIds = gameController.getValidSettlementIds(p);
+        enterBuildMode(validIds, java.util.Collections.emptySet(),
+                       java.util.Collections.emptySet(), currentBoard);
+        appendLog("[Setup] Tempatkan Pos Pantau.");
+    }
+
+    /** Setup pipe mode — hanya path adjacent ke settlement yang baru ditempatkan. */
+    private void enterSetupPipeMode(int adjacentIntersectionId) {
+        if (gameController == null || currentBoard == null) return;
+        Player p = gameController.getActivePlayer();
+        Set<Integer> pipePaths = gameController.getValidPipeIds(p, adjacentIntersectionId);
+        enterBuildMode(java.util.Collections.emptySet(), java.util.Collections.emptySet(),
+                       pipePaths, currentBoard);
+        appendLog("[Setup] Tempatkan Pipa adjacent ke pos baru.");
+    }
+
+    /** Discard sequence — loop SEMUA player dengan >7 kartu. */
+    private java.util.Deque<model.player.Player> discardQueue = new java.util.ArrayDeque<>();
+
+    private void openDiscardDialogSequence() {
+        if (gameController == null) return;
+        discardQueue = new java.util.ArrayDeque<>(gameController.getPlayersRequiredToDiscard());
+        processNextDiscard();
+    }
+
+    private void processNextDiscard() {
+        if (discardQueue.isEmpty()) return; // semua sudah discard
+        model.player.Player current = discardQueue.poll();
+        int count = gameController.computeDiscardCount(current);
+        appendLog("⚠ " + current.getName() + " harus buang " + count + " kartu resource.");
+        // TODO: Buka DiscardDialog UI (menunggu asset popup_discard.png)
+        // Sementara: auto-discard random untuk tidak block game flow
+        // discardOverlay.showForPlayer(current, count, () -> processNextDiscard());
+    }
+
+    // ── Phase gating & centered warnings ────────────────────────────
+
+    /** Shared centered warning label — added to designPane, spans full 1920px width. */
+    private Label centeredWarningLabel;
+    private Timeline centeredWarningTimeline;
+
+    /** Call once during initialize to create the shared warning overlay. */
     private void setupRollDiceWarning() {
-        rollDiceWarningLabel = new Label("Roll Dadu Terlebih Dahulu!");
-        rollDiceWarningLabel.setStyle(
+        centeredWarningLabel = new Label();
+        centeredWarningLabel.setStyle(
             "-fx-text-fill: red;" +
             "-fx-font-size: 22px;" +
             "-fx-font-weight: bold;" +
-            "-fx-effect: dropshadow(gaussian, white, 4, 0.5, 0, 0);"
+            "-fx-alignment: center;" +
+            "-fx-effect: dropshadow(gaussian, white, 5, 0.6, 0, 0);"
         );
         if (arcadeFont != null) {
-            rollDiceWarningLabel.setFont(Font.font(arcadeFont.getFamily(), 20));
+            centeredWarningLabel.setFont(Font.font(arcadeFont.getFamily(), 20));
         }
-        rollDiceWarningLabel.setVisible(false);
-        rollDiceWarningLabel.setUserData("roll-dice-warning");
-        rollDiceWarningLabel.setMouseTransparent(true);
-        // Position center of board area
-        rollDiceWarningLabel.setLayoutX(300);
-        rollDiceWarningLabel.setLayoutY(500);
-        boardPane.getChildren().add(rollDiceWarningLabel);
+        // Full-width label centered at y=490 (vertical center of 1080 screen)
+        centeredWarningLabel.setPrefWidth(DESIGN_WIDTH);
+        centeredWarningLabel.setLayoutX(0);
+        centeredWarningLabel.setLayoutY(490);
+        centeredWarningLabel.setMouseTransparent(true);
+        centeredWarningLabel.setVisible(false);
+        centeredWarningLabel.setUserData("centered-warning");
+        designPane.getChildren().add(centeredWarningLabel);
+    }
+
+    /** Show a centered warning message for durationMs milliseconds (color: "red" default). */
+    private void showCenteredWarning(String message, double durationMs) {
+        showCenteredWarning(message, durationMs, "red");
+    }
+
+    private void showCenteredWarning(String message, double durationMs, String cssColor) {
+        if (centeredWarningLabel == null) return;
+        if (centeredWarningTimeline != null) centeredWarningTimeline.stop();
+        centeredWarningLabel.setText(message);
+        centeredWarningLabel.setStyle(
+            "-fx-text-fill: " + cssColor + ";" +
+            "-fx-font-size: 22px;" +
+            "-fx-font-weight: bold;" +
+            "-fx-alignment: center;" +
+            "-fx-effect: dropshadow(gaussian, white, 5, 0.6, 0, 0);"
+        );
+        if (arcadeFont != null) centeredWarningLabel.setFont(Font.font(arcadeFont.getFamily(), 20));
+        centeredWarningLabel.setVisible(true);
+        centeredWarningLabel.toFront();
+        centeredWarningTimeline = new Timeline(
+            new KeyFrame(Duration.millis(durationMs), e -> centeredWarningLabel.setVisible(false))
+        );
+        centeredWarningTimeline.play();
     }
 
     private void showRollDiceWarning() {
-        if (rollDiceWarningLabel == null) return;
-        if (rollDiceWarningTimeline != null) rollDiceWarningTimeline.stop();
-        rollDiceWarningLabel.setVisible(true);
-        rollDiceWarningTimeline = new Timeline(
-            new KeyFrame(Duration.millis(1500), e -> rollDiceWarningLabel.setVisible(false))
-        );
-        rollDiceWarningTimeline.play();
+        showCenteredWarning("Roll Dadu Terlebih Dahulu!", 1500);
     }
 
     /** Returns true if the action can proceed; shows warning and returns false otherwise. */
@@ -4716,38 +5015,45 @@ public class GameRevisionController {
     @FXML
     private void onDeclareVictoryClicked() {
         if (!requireDiceRolled()) return;
-        int vp = currentPlayerVP();
-        if (vp < VICTORY_THRESHOLD) {
-            showRollDiceWarning(); // reuse label with custom text temporarily
-            if (rollDiceWarningLabel != null) {
-                rollDiceWarningLabel.setText("Butuh " + VICTORY_THRESHOLD + " VP! (kamu: " + vp + " VP)");
-                rollDiceWarningLabel.setVisible(true);
-                if (rollDiceWarningTimeline != null) rollDiceWarningTimeline.stop();
-                rollDiceWarningTimeline = new Timeline(
-                    new KeyFrame(Duration.millis(2000), e -> {
-                        rollDiceWarningLabel.setVisible(false);
-                        rollDiceWarningLabel.setText("Roll Dadu Terlebih Dahulu!");
-                    })
-                );
-                rollDiceWarningTimeline.play();
-            }
+
+        // Cek VP dari engine jika tersedia, fallback ke local cache
+        int vp = (gameController != null)
+            ? gameController.computeVictoryPoints(gameController.getActivePlayer())
+            : currentPlayerVP();
+        int threshold = (gameController != null)
+            ? gameController.getVictoryThreshold()
+            : VICTORY_THRESHOLD;
+
+        if (vp < threshold) {
+            showCenteredWarning("Butuh " + threshold + " VP! (kamu: " + vp + " VP)", 2000);
             return;
         }
         if (declareVictoryOverlayController == null) {
-            showInformationPopup("Declare Victory screen is not available.", InformationCloseAction.RETURN_TO_GAME);
+            showInformationPopup("Declare Victory screen is not available.",
+                InformationCloseAction.RETURN_TO_GAME);
             return;
         }
         declareVictoryOverlayController.showDeclareVictoryScreen();
     }
+
     @FXML
     public void onEndTurnClicked() {
         if (!requireDiceRolled()) return;
-        // If dice is still spinning, stop immediately and resolve
+        // Jika dadu masih berputar, stop dan selesaikan
         if (diceTimeline != null && diceTimeline.getStatus() == Animation.Status.RUNNING) {
             diceTimeline.stop();
             finalizeDiceRoll();
+            return; // finalizeDiceRoll → engine → callbacks akan lanjutkan flow
         }
-        performEndTurn();
+        if (gameController != null) {
+            try {
+                gameController.endTurn(); // engine fires onTurnChanged + onPhaseChanged
+            } catch (Exception e) {
+                appendLog("❌ End turn gagal: " + e.getMessage());
+            }
+        } else {
+            performEndTurn(); // fallback offline
+        }
     }
 
     @FXML
