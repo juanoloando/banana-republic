@@ -144,7 +144,7 @@ public class HexRevisionRenderer {
         String label = formatHarborLabel(harbor);
         Text text = new Text(label);
         text.setFont(Font.font("Arcade Normal", FontWeight.BOLD, HARBOR_FONT_SIZE));
-        text.setFill(Color.BLACK);
+        text.setFill(Color.TRANSPARENT);
 
         // Approximate horizontal centering (~9px per char at 16pt)
         double approxWidth = label.length() * 9.0;

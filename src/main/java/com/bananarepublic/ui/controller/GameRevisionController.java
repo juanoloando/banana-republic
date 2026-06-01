@@ -4930,6 +4930,7 @@ public class GameRevisionController implements GameUICallback {
                 updatePhaseDisplay(false);
                 diceRolled = false;
                 diceRollMode = DiceRollMode.NONE;
+                clearDiceDisplay(); // sembunyikan dadu — hanya muncul saat roll dipencet
                 exitBuildMode();
                 exitRobberMoveMode();
                 if (previousPhase == TurnPhase.SETUP_PLACE_SECOND) {
@@ -4994,6 +4995,11 @@ public class GameRevisionController implements GameUICallback {
 
     @Override
     public void onTurnChanged(Player newActivePlayer) {
+        // Sembunyikan dadu saat giliran berganti — muncul lagi hanya saat roll dipencet
+        clearDiceDisplay();
+        diceRolled = false;
+        diceRollMode = DiceRollMode.NONE;
+
         activePlayerIndex = gameController != null
             ? gameController.getCurrentPlayerIdx() : (activePlayerIndex + 1) % playerCount;
         updateTurnDisplay(newActivePlayer.getName());
