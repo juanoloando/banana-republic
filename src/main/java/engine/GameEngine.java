@@ -90,6 +90,17 @@ public class GameEngine {
         return state;
     }
 
+    /** Save the current game state to the given file using JsonSaveLoadService. */
+    public void saveGame(java.io.File file) throws java.io.IOException {
+        new persistence.JsonSaveLoadService().save(state, file);
+    }
+
+    /** Load and inject a card plugin JAR into the live deck at runtime. */
+    public void injectCardPlugin(java.io.File jarFile) throws plugin.PluginLoadException {
+        plugin.CardPluginLoader loader = new plugin.CardPluginLoader();
+        loader.loadAllAndInject(jarFile, state.getDeck());
+    }
+
     public void setManualDice(int die1, int die2) {
         dice.setManualResult(die1, die2);
     }

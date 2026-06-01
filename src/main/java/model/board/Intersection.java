@@ -77,6 +77,19 @@ public class Intersection {
         return building != null && building.getOwnerName().equals(playerName);
     }
 
+    // Package-private: used by IntersectionPathBuilder to populate adjacency after construction
+    void addAdjacentIntersectionId(int id) {
+        if (!adjacentIntersectionIds.contains(id)) {
+            adjacentIntersectionIds.add(id);
+        }
+    }
+
+    void addAdjacentPathId(int id) {
+        if (!adjacentPathIds.contains(id)) {
+            adjacentPathIds.add(id);
+        }
+    }
+
     @Override
     public String toString() {
         return "Intersection{id=" + id

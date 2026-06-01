@@ -101,6 +101,22 @@ public class GameController extends GameEngineAdapter {
     public boolean isCardPlayedThisTurn()              { return engine.isCardPlayedThisTurn(); }
     public DiceResult getLastDiceResult()              { return engine.getLastDiceResult(); }
 
+    /** Save current game state to JSON file. Returns true on success. */
+    public boolean saveGame(java.io.File file) {
+        try {
+            engine.saveGame(file);
+            return true;
+        } catch (Exception e) {
+            System.err.println("Save failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /** Inject a card plugin JAR into the live deck at runtime. */
+    public void injectCardPlugin(java.io.File jarFile) throws plugin.PluginLoadException {
+        engine.injectCardPlugin(jarFile);
+    }
+
     /** Hitung VP player dari buildings + VP cards + special cards. */
     public int computeVictoryPoints(Player player) {
         return victoryManager.computeVictoryPoints(player, getBoard());
