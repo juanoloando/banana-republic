@@ -91,10 +91,43 @@ public final class GameFactory {
         }
 
         // ── Board ─────────────────────────────────────────────────────
-        // StandardMapGenerator always produces the same 19-tile layout,
-        // so we use it for the engine board. Tile visuals are rendered
-        // from saveData.mapConfig in the UI layer separately.
         Board board = new StandardMapGenerator().generateBoard();
+
+        // Tempatkan bangunan & pipe dari save ke engine board agar BuildValidator valid
+        for (int i = 0; i < saveData.players.size(); i++) {
+            SaveData.PlayerData pd = saveData.players.get(i);
+            HumanPlayer player = (HumanPlayer) players.get(i);
+
+            if (pd.buildings != null) {
+                for (SaveData.BuildingData bd : pd.buildings) {
+                    board.getIntersection(bd.intersectionId).ifPresent(inter -> {
+                        if (inter.getBuilding().isEmpty()) {
+                            model.building.Building bld =
+                                "LABORATORY".equalsIgnoreCase(bd.buildingType)
+                                    ? new model.building.Laboratory(player.getName())
+                                    : new model.building.Settlement(player.getName());
+                            inter.placeBuilding(bld);
+                            if ("LABORATORY".equalsIgnoreCase(bd.buildingType)) {
+                                player.upgradeLaboratory(bd.intersectionId);
+                            } else {
+                                player.placeSettlement(bd.intersectionId);
+                            }
+                        }
+                    });
+                }
+            }
+
+            if (pd.pipePathIds != null) {
+                for (int pathId : pd.pipePathIds) {
+                    board.getPath(pathId).ifPresent(path -> {
+                        if (path.isEmpty()) {
+                            path.placePipe(new model.building.Pipe(player.getName()));
+                            player.placePipe(pathId);
+                        }
+                    });
+                }
+            }
+        }
 
         // ── Bank ──────────────────────────────────────────────────────
         ResourceBank bank;
@@ -120,8 +153,32 @@ public final class GameFactory {
 
         // ── State + engine ────────────────────────────────────────────
         GameStateImpl state = new GameStateImpl(board, players, bank, deck, robberPos);
-        GameEngine engine   = new GameEngine(state);
 
+        // Restore phase dari save, dengan aturan:
+        // - Setup phase → pertahankan (belum selesai setup)
+        // - GAME_OVER   → pertahankan
+        // - Semua lainnya (TRADE_BUILD, ROBBER_*) → reset ke ROLL_DICE
+        //   agar pemain bisa langsung lempar dadu setelah load
+        engine.TurnPhase phaseToRestore = engine.TurnPhase.ROLL_DICE; // default
+        if (saveData.currentPhase != null) {
+            try {
+                engine.TurnPhase savedPhase = engine.TurnPhase.valueOf(
+                    saveData.currentPhase.trim().toUpperCase());
+                if (savedPhase == engine.TurnPhase.SETUP_PLACE_FIRST
+                 || savedPhase == engine.TurnPhase.SETUP_PLACE_SECOND
+                 || savedPhase == engine.TurnPhase.GAME_OVER) {
+                    phaseToRestore = savedPhase;
+                }
+                // Semua fase lain (TRADE_BUILD, ROBBER_*, ROLL_DICE) → ROLL_DICE
+            } catch (IllegalArgumentException ignored) {}
+        }
+        state.setCurrentPhase(phaseToRestore);
+        if (saveData.currentPlayerIndex >= 0
+                && saveData.currentPlayerIndex < players.size()) {
+            state.setCurrentPlayerIndex(saveData.currentPlayerIndex);
+        }
+
+        GameEngine engine = new GameEngine(state);
         GameController controller = new GameController(engine);
         engine.addListener(controller);
 
