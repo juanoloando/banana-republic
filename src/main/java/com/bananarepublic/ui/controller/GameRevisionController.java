@@ -499,6 +499,7 @@ public class GameRevisionController implements GameUICallback {
         setupPlayerCardBoxes();
         renderHexBoard();
         setupBoardLayers();
+        renderBuildingsAndPipesFromSave(); // render bangunan & pipe dari save data
         initInventory();
         initBankStock();
         initializeTradeState();
@@ -4185,7 +4186,10 @@ public class GameRevisionController implements GameUICallback {
         // Pipes and buildings don't need to receive clicks
         pipeLayer.setMouseTransparent(true);
         buildingLayer.setMouseTransparent(true);
-        boardPane.getChildren().addAll(circleLayer, pipeLayer, buildingLayer);
+        // Hanya tambahkan jika belum ada — mencegah duplicate children exception
+        if (!boardPane.getChildren().contains(circleLayer)) {
+            boardPane.getChildren().addAll(circleLayer, pipeLayer, buildingLayer);
+        }
     }
 
     // ── Build mode ───────────────────────────────────────────────────
@@ -4474,6 +4478,35 @@ public class GameRevisionController implements GameUICallback {
             return "Not enough resources to build Pipe.";
         }
         return rawMessage;
+    }
+
+    // ── Restore buildings & pipes dari save data ─────────────────────
+
+    /** Dipanggil saat initialize — render semua bangunan & pipe dari SaveData. */
+    private void renderBuildingsAndPipesFromSave() {
+        SaveData saveData = GameSession.getLoadedSaveData();
+        if (saveData == null || saveData.players == null) return;
+
+        String[] colorNames = {"red", "blue", "green", "yellow"};
+        for (int i = 0; i < saveData.players.size(); i++) {
+            SaveData.PlayerData pd = saveData.players.get(i);
+            String colorName = colorNames[i % colorNames.length];
+
+            // Render bangunan (outpost / lab)
+            if (pd.buildings != null) {
+                for (SaveData.BuildingData bd : pd.buildings) {
+                    String type = "LABORATORY".equalsIgnoreCase(bd.buildingType) ? "lab" : "pos";
+                    renderBuildingOnMap(bd.intersectionId, type, colorName);
+                }
+            }
+
+            // Render pipe
+            if (pd.pipePathIds != null) {
+                for (int pathId : pd.pipePathIds) {
+                    renderPipeOnMap(pathId, i);
+                }
+            }
+        }
     }
 
     // ── Building / pipe rendering ─────────────────────────────────────
@@ -5004,114 +5037,165 @@ public class GameRevisionController implements GameUICallback {
     @Override
     public void onRobberMoved(HexCoordinate newPosition) {
         if (currentBoard != null) {
+            // Re-render board dengan posisi robber baru
+            // setupBoardLayers() TIDAK dipanggil di sini — sudah dipanggil saat initialize
             hexRevisionRenderer.render(boardPane,
                 currentBoard.getAllTiles(), newPosition, currentBoard);
-            setupBoardLayers();
         }
-        appendLog("Nimon Ungu moved.");
-        showStealDialogIfNeeded();
+        appendLog("⚫ Nimon Ungu dipindah.");
+        showStealDialogIfNeeded(); // selalu tampilkan popup resource theft
     }
 
     private void showStealDialogIfNeeded() {
         if (gameController == null) return;
+        // Popup selalu muncul setelah robber dipindah, meskipun tidak ada kandidat
         List<model.player.Player> candidates = gameController.getStealCandidates();
-        if (candidates.isEmpty()) {
-            appendLog("No steal candidates.");
-            return;
-        }
-        showStealDialog(candidates);
+        showStealDialog(candidates); // candidates bisa kosong → popup tetap muncul, user tinggal tutup X
     }
 
     private void showStealDialog(List<model.player.Player> candidates) {
-        StackPane overlay = new StackPane();
-        overlay.setStyle("-fx-background-color: rgba(0,0,0,0.65);");
-        overlay.prefWidthProperty().bind(rootPane.widthProperty());
-        overlay.prefHeightProperty().bind(rootPane.heightProperty());
-        overlay.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        // Resource Theft popup — pakai Resource theft.png background
+        // Steal OPSIONAL: pemain bisa tutup dengan X tanpa mencuri
+        double popupW = 1048, popupH = 753;
+        double popupX = (DESIGN_WIDTH  - popupW) / 2.0;
+        double popupY = (DESIGN_HEIGHT - popupH) / 2.0;
 
-        VBox dialog = new VBox(16);
-        dialog.setMaxWidth(400);
-        dialog.setStyle("-fx-background-color: #f5e8c8; -fx-border-color: #7a4a23; "
-            + "-fx-border-width: 3; -fx-padding: 26; -fx-background-radius: 14; -fx-border-radius: 14;");
-        dialog.setAlignment(Pos.CENTER);
+        Pane overlay = new Pane();
+        overlay.setLayoutX(0); overlay.setLayoutY(0);
+        overlay.setPrefSize(DESIGN_WIDTH, DESIGN_HEIGHT);
+        overlay.setStyle("-fx-background-color: rgba(0,0,0,0.55);");
+        overlay.setUserData("steal-overlay");
 
-        Label header = new Label("Resource Theft");
-        header.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2f2010;");
+        Pane popup = new Pane();
+        popup.setLayoutX(popupX); popup.setLayoutY(popupY);
+        popup.setPrefSize(popupW, popupH);
 
-        Label sub = new Label("Select a player to steal from, or skip.");
-        sub.setStyle("-fx-font-size: 13px; -fx-text-fill: #3d2008;");
-        sub.setWrapText(true);
+        ImageView bg = new ImageView(new Image(getClass().getResource(
+            "/com/bananarepublic/images/game_revision/Resource theft.png").toExternalForm()));
+        bg.setFitWidth(popupW); bg.setFitHeight(popupH); bg.setPreserveRatio(false);
+        popup.getChildren().add(bg);
 
-        HBox playerRow = new HBox(16);
-        playerRow.setAlignment(Pos.CENTER);
+        // Player candidate cards — hanya yang punya bangunan di sekitar robber
+        List<model.player.Player> allPlayers = gameController != null
+            ? gameController.getAllPlayers() : candidates;
+        java.util.Set<String> candidateNames = new java.util.HashSet<>();
+        for (model.player.Player c : candidates) candidateNames.add(c.getName());
+
+        HBox cardRow = new HBox(28);
+        cardRow.setAlignment(Pos.CENTER);
+        double cardAreaW = popupW * 0.86;
+        cardRow.setLayoutX((popupW - cardAreaW) / 2.0);
+        cardRow.setLayoutY(330);
+        cardRow.setPrefWidth(cardAreaW);
 
         model.player.Player[] selected = {null};
-        List<VBox> cards = new ArrayList<>();
+        String normalStyle   = "-fx-background-color: rgba(200,160,80,0.55); -fx-background-radius: 12; -fx-padding: 10; -fx-cursor: hand;";
+        String selectedStyle = "-fx-background-color: rgba(220,160,20,0.90); -fx-background-radius: 12; -fx-padding: 10; -fx-cursor: hand; -fx-border-color: #8B4513; -fx-border-width: 2; -fx-border-radius: 12;";
+        String disabledStyle = "-fx-background-color: rgba(120,100,60,0.20); -fx-background-radius: 12; -fx-padding: 10;";
+        String[] profilePaths = {
+            "/com/bananarepublic/images/game_revision/profilepictPlayer1.png",
+            "/com/bananarepublic/images/game_revision/profilepictPlayer2.png",
+            "/com/bananarepublic/images/game_revision/profilepictPlayer3.png",
+            "/com/bananarepublic/images/game_revision/profilepictPlayer4.png"
+        };
+        List<VBox> cardViews = new ArrayList<>();
 
-        String normalStyle = "-fx-background-color: #ece0c0; -fx-padding: 14; "
-            + "-fx-background-radius: 10; -fx-cursor: hand; -fx-border-width: 2; "
-            + "-fx-border-color: transparent; -fx-border-radius: 10;";
-        String selectedStyle = "-fx-background-color: #c8961e; -fx-padding: 14; "
-            + "-fx-background-radius: 10; -fx-cursor: hand; -fx-border-width: 2; "
-            + "-fx-border-color: #7a4a23; -fx-border-radius: 10;";
+        for (int i = 0; i < allPlayers.size(); i++) {
+            model.player.Player p = allPlayers.get(i);
+            boolean isActive    = (gameController != null
+                && p.getName().equals(gameController.getActivePlayer().getName()));
+            boolean isCandidate = candidateNames.contains(p.getName()) && !isActive;
 
-        for (model.player.Player candidate : candidates) {
             VBox card = new VBox(8);
             card.setAlignment(Pos.CENTER);
-            card.setPrefWidth(100);
-            card.setStyle(normalStyle);
+            card.setPrefWidth(130);
+            card.setStyle(isCandidate ? normalStyle : disabledStyle);
+            // Simpan nama pemain di userData agar tidak bergantung pada index children
+            card.setUserData(p.getName());
 
-            Label nameLabel = new Label(candidate.getName());
-            nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #2f2010;");
+            try {
+                String profPath = i < profilePaths.length ? profilePaths[i] : profilePaths[0];
+                ImageView prof = new ImageView(new Image(
+                    getClass().getResource(profPath).toExternalForm()));
+                prof.setFitWidth(64); prof.setFitHeight(64); prof.setPreserveRatio(true);
+                prof.setMouseTransparent(true);
+                card.getChildren().add(prof);
+            } catch (Exception ignored) {}
+
+            Label nameLabel = new Label(p.getName());
+            nameLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #2f2010;");
+            if (arcadeFont != null) nameLabel.setFont(Font.font(arcadeFont.getFamily(), 10));
             nameLabel.setMouseTransparent(true);
 
-            Label resLabel = new Label(candidate.getTotalResourceCount() + " cards");
-            resLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #5b2e0a;");
-            resLabel.setMouseTransparent(true);
+            Label cardCount = new Label(p.getTotalResourceCount() + " kartu");
+            cardCount.setStyle("-fx-font-size: 10px; -fx-text-fill: #5b2e0a;");
+            if (arcadeFont != null) cardCount.setFont(Font.font(arcadeFont.getFamily(), 9));
+            cardCount.setMouseTransparent(true);
 
-            card.getChildren().addAll(nameLabel, resLabel);
-            card.setOnMouseClicked(ev -> {
-                selected[0] = candidate;
-                for (VBox c : cards) c.setStyle(normalStyle);
-                card.setStyle(selectedStyle);
-            });
-            cards.add(card);
-            playerRow.getChildren().add(card);
+            card.getChildren().addAll(nameLabel, cardCount);
+
+            if (isCandidate) {
+                final model.player.Player pFinal = p;
+                card.setOnMouseClicked(ev -> {
+                    selected[0] = pFinal;
+                    // Gunakan userData (bukan children index) untuk lookup nama yang reliable
+                    for (VBox cv : cardViews) {
+                        String cName = (String) cv.getUserData();
+                        boolean cIsCandidate = cName != null && candidateNames.contains(cName)
+                            && (gameController == null || !cName.equals(
+                                gameController.getActivePlayer().getName()));
+                        cv.setStyle(!cIsCandidate ? disabledStyle
+                            : cName.equals(pFinal.getName()) ? selectedStyle : normalStyle);
+                    }
+                });
+            }
+            cardViews.add(card);
+            cardRow.getChildren().add(card);
         }
+        popup.getChildren().add(cardRow);
 
-        HBox buttonRow = new HBox(16);
-        buttonRow.setAlignment(Pos.CENTER);
+        // Keterangan di bawah cards
+        Label hintLabel = new Label("Steal opsional — pilih pemain atau tutup dengan ×");
+        hintLabel.setLayoutX(50); hintLabel.setLayoutY(590);
+        hintLabel.setPrefWidth(popupW - 100); hintLabel.setAlignment(Pos.CENTER);
+        hintLabel.setStyle("-fx-text-fill: #5b2e0a; -fx-font-size: 11px; -fx-alignment: center;");
+        if (arcadeFont != null) hintLabel.setFont(Font.font(arcadeFont.getFamily(), 10));
+        popup.getChildren().add(hintLabel);
 
-        Button skipBtn = new Button("SKIP");
-        skipBtn.setStyle("-fx-background-color: #a09080; -fx-text-fill: white; -fx-font-size: 13px; "
-            + "-fx-pref-width: 110; -fx-pref-height: 38; -fx-background-radius: 8;");
-        skipBtn.setOnAction(ev -> {
-            rootPane.getChildren().remove(overlay);
-            appendLog("Steal skipped.");
+        // X close button (top-right header area)
+        Button closeBtn = new Button();
+        closeBtn.setLayoutX(947); closeBtn.setLayoutY(118);
+        closeBtn.setPrefWidth(72); closeBtn.setPrefHeight(72);
+        closeBtn.setOpacity(0.0); closeBtn.getStyleClass().add("transparent-click-zone");
+        closeBtn.setOnAction(ev -> {
+            designPane.getChildren().remove(overlay);
+            appendLog("Resource theft dilewati.");
         });
+        popup.getChildren().add(closeBtn);
 
-        Button stealBtn = new Button("CONFIRM STEAL");
-        stealBtn.setStyle("-fx-background-color: #7a4a23; -fx-text-fill: white; -fx-font-size: 13px; "
-            + "-fx-font-weight: bold; -fx-pref-width: 160; -fx-pref-height: 38; -fx-background-radius: 8;");
-        stealBtn.setOnAction(ev -> {
+        // CONFIRM button (hitbox — gambar sudah di PNG background)
+        Button confirmBtn = new Button();
+        confirmBtn.setLayoutX(802); confirmBtn.setLayoutY(643);
+        confirmBtn.setPrefWidth(215); confirmBtn.setPrefHeight(70);
+        confirmBtn.setOpacity(0.0); confirmBtn.getStyleClass().add("transparent-click-zone");
+        confirmBtn.setOnAction(ev -> {
             if (selected[0] == null) {
-                sub.setText("Please select a player first.");
-                sub.setStyle("-fx-font-size: 13px; -fx-text-fill: #b7261e;");
+                hintLabel.setText("❌ Pilih pemain dulu, atau tutup dengan ×!");
+                hintLabel.setStyle("-fx-text-fill: #b7261e; -fx-font-size: 11px; -fx-alignment: center;");
                 return;
             }
-            rootPane.getChildren().remove(overlay);
+            designPane.getChildren().remove(overlay);
             try {
                 gameController.stealFromPlayer(selected[0]);
+                // onResourceStolen callback akan update inventory kedua pemain
             } catch (Exception ex) {
-                appendLog("Steal failed: " + ex.getMessage());
+                appendLog("Steal gagal: " + ex.getMessage());
             }
         });
+        popup.getChildren().add(confirmBtn);
 
-        buttonRow.getChildren().addAll(skipBtn, stealBtn);
-        dialog.getChildren().addAll(header, sub, playerRow, buttonRow);
-        StackPane.setAlignment(dialog, Pos.CENTER);
-        overlay.getChildren().add(dialog);
-        rootPane.getChildren().add(overlay);
+        overlay.getChildren().add(popup);
+        designPane.getChildren().add(overlay);
         overlay.toFront();
     }
 
@@ -5248,7 +5332,11 @@ public class GameRevisionController implements GameUICallback {
     }
 
     private void processNextDiscard() {
-        if (discardQueue.isEmpty()) return;
+        if (discardQueue.isEmpty()) {
+            // Semua player sudah discard → player aktif sekarang harus pindah robber
+            enterRobberMoveMode();
+            return;
+        }
         model.player.Player current = discardQueue.poll();
         int count = gameController.computeDiscardCount(current);
         appendLog("⚠ " + current.getName() + " harus buang " + count + " kartu resource.");
@@ -5256,34 +5344,52 @@ public class GameRevisionController implements GameUICallback {
     }
 
     private void showDiscardDialog(model.player.Player player, int count, Runnable onComplete) {
-        StackPane overlay = new StackPane();
-        overlay.setStyle("-fx-background-color: rgba(0,0,0,0.68);");
-        overlay.prefWidthProperty().bind(rootPane.widthProperty());
-        overlay.prefHeightProperty().bind(rootPane.heightProperty());
-        overlay.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        // Nimons Purple Effect popup — pakai Nimons Purple Effect.png background
+        // PENTING: Kartu Temuan/Experiment TIDAK BOLEH ditampilkan atau dibuang (spesifikasi)
+        double popupW = 1048, popupH = 753;
+        double popupX = (DESIGN_WIDTH  - popupW) / 2.0;
+        double popupY = (DESIGN_HEIGHT - popupH) / 2.0;
 
-        VBox dialog = new VBox(14);
-        dialog.setMaxWidth(540);
-        dialog.setStyle("-fx-background-color: #f5e8c8; -fx-border-color: #7a4a23; "
-            + "-fx-border-width: 3; -fx-padding: 26; -fx-background-radius: 14; -fx-border-radius: 14;");
-        dialog.setAlignment(Pos.CENTER_LEFT);
+        Pane overlay = new Pane();
+        overlay.setLayoutX(0); overlay.setLayoutY(0);
+        overlay.setPrefSize(DESIGN_WIDTH, DESIGN_HEIGHT);
+        overlay.setStyle("-fx-background-color: rgba(0,0,0,0.60);");
+        overlay.setUserData("discard-overlay");
 
-        Label header = new Label("⚠ Hand Limit Exceeded!");
-        header.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #b7261e;");
+        Pane popup = new Pane();
+        popup.setLayoutX(popupX); popup.setLayoutY(popupY);
+        popup.setPrefSize(popupW, popupH);
 
-        Label sub = new Label("A 7 was rolled.  " + player.getName() + " has "
-            + player.getTotalResourceCount() + " cards.  Must discard " + count + ".");
-        sub.setStyle("-fx-font-size: 13px; -fx-text-fill: #3d2008;");
-        sub.setWrapText(true);
+        ImageView bg = new ImageView(new Image(getClass().getResource(
+            "/com/bananarepublic/images/game_revision/Nimons Purple Effect.png").toExternalForm()));
+        bg.setFitWidth(popupW); bg.setFitHeight(popupH); bg.setPreserveRatio(false);
+        popup.getChildren().add(bg);
 
+        // Instruksi — overlay di area sub-heading PNG
+        Label subLabel = new Label(player.getName() + "  •  Buang " + count + " kartu resource");
+        subLabel.setLayoutX(50); subLabel.setLayoutY(255);
+        subLabel.setPrefWidth(popupW - 100); subLabel.setAlignment(Pos.CENTER);
+        subLabel.setStyle("-fx-text-fill: #3d2008; -fx-font-size: 12px; -fx-alignment: center;");
+        if (arcadeFont != null) subLabel.setFont(Font.font(arcadeFont.getFamily(), 10));
+        popup.getChildren().add(subLabel);
+
+        Label selectedLabel = new Label("0 / " + count + " dipilih");
+        selectedLabel.setLayoutX(50); selectedLabel.setLayoutY(580);
+        selectedLabel.setPrefWidth(popupW - 100); selectedLabel.setAlignment(Pos.CENTER);
+        selectedLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-alignment: center; -fx-text-fill: #3d2008;");
+        if (arcadeFont != null) selectedLabel.setFont(Font.font(arcadeFont.getFamily(), 10));
+        popup.getChildren().add(selectedLabel);
+
+        // Resource cards row — HANYA resource cards, bukan experiment cards
         EnumMap<ResourceType, Integer> discardMap = new EnumMap<>(ResourceType.class);
         for (ResourceType type : ResourceType.values()) discardMap.put(type, 0);
 
-        Label selectedLabel = new Label("0 / " + count + " Selected");
-        selectedLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #3d2008; -fx-font-weight: bold;");
-
-        HBox resourceRow = new HBox(14);
-        resourceRow.setAlignment(Pos.CENTER_LEFT);
+        HBox resourceRow = new HBox(18);
+        resourceRow.setAlignment(Pos.CENTER);
+        double rowW = popupW * 0.82;
+        resourceRow.setLayoutX((popupW - rowW) / 2.0);
+        resourceRow.setLayoutY(300);
+        resourceRow.setPrefWidth(rowW);
 
         for (ResourceType type : ResourceType.values()) {
             int held = player.getResourceCount(type);
@@ -5291,88 +5397,85 @@ public class GameRevisionController implements GameUICallback {
 
             VBox cell = new VBox(6);
             cell.setAlignment(Pos.CENTER);
-            cell.setStyle("-fx-background-color: #ece0c0; -fx-padding: 8; -fx-background-radius: 8;");
+            cell.setStyle("-fx-background-color: rgba(220,195,140,0.70); -fx-padding: 8; -fx-background-radius: 8;");
 
             ImageView icon = new ImageView(loadInventoryImage(type));
-            icon.setFitWidth(50);
-            icon.setFitHeight(70);
-            icon.setPreserveRatio(false);
+            icon.setFitWidth(56); icon.setFitHeight(78); icon.setPreserveRatio(false);
 
-            Label holdLabel = new Label("Hold: " + held);
-            holdLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #5b2e0a;");
+            Label holdLabel = new Label("x" + held);
+            holdLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #5b2e0a; -fx-font-weight: bold;");
+            if (arcadeFont != null) holdLabel.setFont(Font.font(arcadeFont.getFamily(), 9));
 
             Label qtyLabel = new Label("0");
-            qtyLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2f2010;");
-            qtyLabel.setPrefWidth(28);
-            qtyLabel.setAlignment(Pos.CENTER);
+            qtyLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #2f2010;");
+            qtyLabel.setPrefWidth(30); qtyLabel.setAlignment(Pos.CENTER);
 
-            Button minus = new Button("-");
-            minus.setStyle("-fx-font-size: 12px; -fx-background-color: #c8a060; -fx-text-fill: white; "
-                + "-fx-pref-width: 26; -fx-pref-height: 26; -fx-background-radius: 4;");
+            Button minus = new Button("−");
+            minus.setStyle("-fx-font-size: 13px; -fx-background-color: #c8a060; -fx-text-fill: white; "
+                + "-fx-pref-width: 28; -fx-pref-height: 28; -fx-background-radius: 4; -fx-cursor: hand;");
             minus.setDisable(true);
 
             Button plus = new Button("+");
-            plus.setStyle("-fx-font-size: 12px; -fx-background-color: #7a4a23; -fx-text-fill: white; "
-                + "-fx-pref-width: 26; -fx-pref-height: 26; -fx-background-radius: 4;");
+            plus.setStyle("-fx-font-size: 13px; -fx-background-color: #7a4a23; -fx-text-fill: white; "
+                + "-fx-pref-width: 28; -fx-pref-height: 28; -fx-background-radius: 4; -fx-cursor: hand;");
 
             HBox ctrl = new HBox(4, minus, qtyLabel, plus);
             ctrl.setAlignment(Pos.CENTER);
 
             Label typeName = new Label(resourceDisplayName(type).toUpperCase());
             typeName.setStyle("-fx-font-size: 9px; -fx-text-fill: #5b2e0a; -fx-font-weight: bold;");
+            if (arcadeFont != null) typeName.setFont(Font.font(arcadeFont.getFamily(), 9));
 
             minus.setOnAction(ev -> {
                 int cur = discardMap.get(type);
                 if (cur > 0) {
-                    discardMap.put(type, cur - 1);
-                    qtyLabel.setText(String.valueOf(cur - 1));
-                    minus.setDisable(cur - 1 <= 0);
-                    plus.setDisable(false);
-                    int total = discardMap.values().stream().mapToInt(Integer::intValue).sum();
-                    selectedLabel.setText(total + " / " + count + " Selected");
-                    selectedLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: "
-                        + (total == count ? "#1a8917" : "#3d2008") + ";");
+                    discardMap.put(type, cur - 1); qtyLabel.setText(String.valueOf(cur - 1));
+                    minus.setDisable(cur - 1 <= 0); plus.setDisable(false);
+                    int tot = discardMap.values().stream().mapToInt(Integer::intValue).sum();
+                    selectedLabel.setText(tot + " / " + count + " dipilih");
+                    selectedLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-alignment: center; -fx-text-fill: "
+                        + (tot == count ? "#1a8917" : "#3d2008") + ";");
                 }
             });
-
             plus.setOnAction(ev -> {
                 int cur = discardMap.get(type);
-                int total = discardMap.values().stream().mapToInt(Integer::intValue).sum();
-                if (cur < held && total < count) {
-                    discardMap.put(type, cur + 1);
-                    qtyLabel.setText(String.valueOf(cur + 1));
+                int tot = discardMap.values().stream().mapToInt(Integer::intValue).sum();
+                if (cur < held && tot < count) {
+                    discardMap.put(type, cur + 1); qtyLabel.setText(String.valueOf(cur + 1));
                     minus.setDisable(false);
-                    int newTotal = total + 1;
-                    plus.setDisable(cur + 1 >= held || newTotal >= count);
-                    selectedLabel.setText(newTotal + " / " + count + " Selected");
-                    selectedLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: "
-                        + (newTotal == count ? "#1a8917" : "#3d2008") + ";");
+                    int newTot = tot + 1;
+                    plus.setDisable(cur + 1 >= held || newTot >= count);
+                    selectedLabel.setText(newTot + " / " + count + " dipilih");
+                    selectedLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-alignment: center; -fx-text-fill: "
+                        + (newTot == count ? "#1a8917" : "#3d2008") + ";");
                 }
             });
 
             cell.getChildren().addAll(icon, holdLabel, ctrl, typeName);
             resourceRow.getChildren().add(cell);
         }
+        popup.getChildren().add(resourceRow);
 
-        Button confirmBtn = new Button("CONFIRM DISCARD");
-        confirmBtn.setStyle("-fx-background-color: #7a4a23; -fx-text-fill: white; -fx-font-size: 14px; "
-            + "-fx-font-weight: bold; -fx-pref-width: 200; -fx-pref-height: 42; -fx-background-radius: 8;");
+        // CONFIRM button (hitbox — gambar sudah di PNG)
+        Button confirmBtn = new Button();
+        confirmBtn.setLayoutX(802); confirmBtn.setLayoutY(643);
+        confirmBtn.setPrefWidth(215); confirmBtn.setPrefHeight(70);
+        confirmBtn.setOpacity(0.0); confirmBtn.getStyleClass().add("transparent-click-zone");
         confirmBtn.setOnAction(ev -> {
             int total = discardMap.values().stream().mapToInt(Integer::intValue).sum();
             if (total != count) {
-                selectedLabel.setText("Must discard exactly " + count + " (selected: " + total + ")");
-                selectedLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #b7261e;");
+                selectedLabel.setText("❌ Harus pilih tepat " + count + " kartu (saat ini: " + total + ")");
+                selectedLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #b7261e; -fx-alignment: center;");
                 return;
             }
-            rootPane.getChildren().remove(overlay);
+            designPane.getChildren().remove(overlay);
             gameController.discardResources(player, discardMap);
-            onComplete.run();
+            onComplete.run(); // → processNextDiscard() untuk player berikutnya
         });
+        popup.getChildren().add(confirmBtn);
 
-        dialog.getChildren().addAll(header, sub, resourceRow, selectedLabel, confirmBtn);
-        StackPane.setAlignment(dialog, Pos.CENTER);
-        overlay.getChildren().add(dialog);
-        rootPane.getChildren().add(overlay);
+        overlay.getChildren().add(popup);
+        designPane.getChildren().add(overlay);
         overlay.toFront();
     }
 
