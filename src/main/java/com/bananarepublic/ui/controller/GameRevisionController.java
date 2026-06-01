@@ -1,6 +1,16 @@
 package com.bananarepublic.ui.controller;
 
 import com.bananarepublic.BananaRepublic;
+import com.bananarepublic.cards.CardDataProvider;
+import com.bananarepublic.cards.CardDefinition;
+import com.bananarepublic.cards.CardDefinitions;
+import com.bananarepublic.cards.CardEffectService;
+import com.bananarepublic.cards.CardTemplateRenderer;
+import com.bananarepublic.cards.CardType;
+import com.bananarepublic.cards.CardUseResult;
+import com.bananarepublic.cards.PlayerCardInventory;
+import com.bananarepublic.cards.UsedCardTracker;
+import com.bananarepublic.cards.UseCardOverlayManager;
 import com.bananarepublic.controller.GameController;
 import com.bananarepublic.controller.GameUICallback;
 import com.bananarepublic.session.GameSession;
@@ -30,6 +40,7 @@ import javafx.scene.text.Font;
 import model.board.*;
 import model.card.CardCategory;
 import model.card.ExperimentCard;
+import model.card.MonopolyCard;
 import model.player.Player;
 import model.resource.ResourceType;
 import persistence.SaveData;
@@ -46,6 +57,14 @@ public class GameRevisionController implements GameUICallback {
 
     private static final double DESIGN_WIDTH  = 1920.0;
     private static final double DESIGN_HEIGHT = 1080.0;
+    private static final List<CardType> INVENTORY_CARD_DISPLAY_ORDER = List.of(
+            CardType.KNIGHT,
+            CardType.ROAD_BUILDING,
+            CardType.MONOPOLY,
+            CardType.VICTORY_POINT,
+            CardType.LONGEST_ROAD,
+            CardType.LARGEST_ARMY
+    );
 
     // ── FXML bindings ─────────────────────────────────────────────────
     @FXML private StackPane rootPane;
@@ -102,8 +121,8 @@ public class GameRevisionController implements GameUICallback {
     @FXML private Label player4PipeLabel;
 
     // Inventory
-    @FXML private HBox inventoryResourceRow;
-    @FXML private HBox inventoryCardRow;
+    @FXML private FlowPane inventoryResourceRow;
+    @FXML private FlowPane inventoryCardRow;
 
     // Info panel (LOG / BANK)
     @FXML private StackPane infoPanelContainer;
@@ -180,6 +199,12 @@ public class GameRevisionController implements GameUICallback {
     // ── State ─────────────────────────────────────────────────────────
     // ── Bridge layer ──────────────────────────────────────────────────
     private GameController gameController;
+    private final Map<Integer, PlayerCardInventory> playerCardInventories = new HashMap<>();
+    private final UsedCardTracker usedCardTracker = new UsedCardTracker();
+    private CardDataProvider cardDataProvider;
+    private CardEffectService cardEffectService;
+    private UseCardOverlayManager useCardOverlayManager;
+    private final CardTemplateRenderer cardTemplateRenderer = new CardTemplateRenderer();
 
     private final HexRevisionRenderer hexRevisionRenderer = new HexRevisionRenderer();
     private final Map<ResourceType, Label> resourceBadgeLabels = new EnumMap<>(ResourceType.class);
@@ -508,6 +533,7 @@ public class GameRevisionController implements GameUICallback {
         updatePhaseDisplay(false);
         hidePopup();
         setupRollDiceWarning();
+        setupCardSystem();
         boolean hasPausedTimer = GameSession.hasPausedGameTimer();
         int pausedSeconds = hasPausedTimer ? GameSession.getPausedTimerSeconds() : -1;
         int pausedPlayerIdx = hasPausedTimer ? GameSession.getPausedActivePlayerIndex() : 0;
@@ -547,6 +573,131 @@ public class GameRevisionController implements GameUICallback {
                     normalizeTradePopupScale();
                 }
             });
+        }
+    }
+
+    private void setupCardSystem() {
+        cardDataProvider = createCardDataProvider();
+        cardEffectService = new CardEffectService(cardDataProvider, usedCardTracker);
+        useCardOverlayManager = new UseCardOverlayManager(
+                designPane,
+                cardDataProvider,
+                cardEffectService,
+                () -> refreshInventoryForPlayerIndex(activePlayerIndex)
+        );
+        syncCardInventoriesFromEngine();
+    }
+
+    private CardDataProvider createCardDataProvider() {
+        return new CardDataProvider() {
+            @Override
+            public int getCurrentPlayerIndex() {
+                return activePlayerIndex;
+            }
+
+            @Override
+            public String getPlayerName(int playerIndex) {
+                List<String> names = getPlayerNames();
+                if (playerIndex < 0 || playerIndex >= names.size()) return "Unknown";
+                return names.get(playerIndex);
+            }
+
+            @Override
+            public List<String> getPlayerNames() {
+                return GameSession.getPlayerNames();
+            }
+
+            @Override
+            public PlayerCardInventory getCardInventory(int playerIndex) {
+                return playerCardInventories.computeIfAbsent(playerIndex, idx -> new PlayerCardInventory());
+            }
+
+            @Override
+            public int getPlayerVictoryPoints(int playerIndex) {
+                if (gameController == null) return 0;
+                List<Player> players = gameController.getAllPlayers();
+                if (playerIndex < 0 || playerIndex >= players.size()) return 0;
+                return gameController.computeVictoryPoints(players.get(playerIndex));
+            }
+
+            @Override
+            public int getVictoryThreshold() {
+                return gameController == null ? 10 : gameController.getVictoryThreshold();
+            }
+
+            @Override
+            public boolean isRoadBuildingEffectInProgress(int playerIndex) {
+                return gameController != null
+                        && gameController.getCurrentPlayerIdx() == playerIndex
+                        && gameController.getCurrentPhase() == TurnPhase.TRADE_BUILD
+                        && gameController.getFreeRoadsRemaining() > 0;
+            }
+
+            @Override
+            public CardUseResult playCard(CardType type, ResourceType monopolyResource) {
+                if (gameController == null) {
+                    return CardUseResult.fail("Game engine is not connected.");
+                }
+                Player active = gameController.getActivePlayer();
+                if (!(active instanceof model.player.HumanPlayer hp)) {
+                    return CardUseResult.fail("Only human players can use cards.");
+                }
+                ExperimentCard selected = hp.getInventory().getCards().stream()
+                        .filter(card -> CardType.fromExperimentCard(card) == type)
+                        .findFirst().orElse(null);
+                if (selected == null) {
+                    return CardUseResult.fail("You do not have this card.");
+                }
+
+                try {
+                    gameController.playCard(selected);
+                    if (type == CardType.MONOPOLY) {
+                        if (!(selected instanceof MonopolyCard monopolyCard)) {
+                            return CardUseResult.fail("Monopoly card is invalid.");
+                        }
+                        if (monopolyResource == null) {
+                            return CardUseResult.fail("Monopoly requires a resource type selection.");
+                        }
+                        gameController.applyMonopolyCard(monopolyCard, monopolyResource);
+                    }
+                    syncAllPlayerStocksFromEngine();
+                    syncCardInventoriesFromEngine();
+                    return CardUseResult.success("Card played.", true, false);
+                } catch (RuntimeException | AssertionError e) {
+                    return CardUseResult.fail(e.getMessage() == null ? "Failed to use card." : e.getMessage());
+                }
+            }
+
+            @Override
+            public void appendLog(String message) {
+                GameRevisionController.this.appendLog(message);
+            }
+
+            @Override
+            public void showInformation(String message) {
+                showInformationPopup(message, InformationCloseAction.RETURN_TO_GAME);
+            }
+        };
+    }
+
+    private void syncCardInventoriesFromEngine() {
+        if (gameController == null) return;
+        List<Player> players = gameController.getAllPlayers();
+        for (int i = 0; i < players.size(); i++) {
+            PlayerCardInventory inventory = playerCardInventories.computeIfAbsent(i, idx -> new PlayerCardInventory());
+            for (CardType type : CardType.values()) {
+                inventory.setQuantity(type, 0);
+            }
+            Player player = players.get(i);
+            if (player instanceof model.player.HumanPlayer hp) {
+                for (ExperimentCard card : hp.getInventory().getCards()) {
+                    CardType type = CardType.fromExperimentCard(card);
+                    if (type != null) {
+                        inventory.addCard(type, 1);
+                    }
+                }
+                usedCardTracker.setPlayedKnightCount(i, hp.getInventory().getKnightCardsPlayed());
+            }
         }
     }
 
@@ -832,10 +983,12 @@ public class GameRevisionController implements GameUICallback {
     private void setupPlayerCardBoxes() {
         Pane[] rows = {player1Row, player2Row, player3Row, player4Row};
         for (int i = 0; i < rows.length; i++) {
-            HBox box = new HBox(3);
-            box.setLayoutX(310);
-            box.setLayoutY(5);
-            box.setPrefHeight(44);
+            HBox box = new HBox(6);
+            box.setLayoutX(304);
+            box.setLayoutY(14);
+            box.setPrefWidth(166);
+            box.setMaxWidth(166);
+            box.setPrefHeight(62);
             box.setAlignment(Pos.CENTER_LEFT);
             rows[i].getChildren().add(box);
             playerCardBoxes.put(i + 1, box);
@@ -903,16 +1056,10 @@ public class GameRevisionController implements GameUICallback {
      * hides cards that reach 0 (traded/used).
      */
     public void refreshResourceCards(Map<ResourceType, Integer> counts) {
-        inventoryResourceRow.getChildren().clear();
-        resourceBadgeLabels.clear();
-        for (ResourceType type : ResourceType.values()) {
-            int count = counts.getOrDefault(type, 0);
-            if (count > 0) {
-                StackPane card = buildResourceCard(type, count);
-                resourceBadgeLabels.put(type, (Label) card.getUserData());
-                inventoryResourceRow.getChildren().add(card);
-            }
-        }
+        playerResourceCounts.clear();
+        playerResourceCounts.putAll(counts);
+        PlayerCardInventory inventory = playerCardInventories.get(activePlayerIndex);
+        rebuildCombinedInventory(counts, inventory);
     }
 
     /**
@@ -920,15 +1067,40 @@ public class GameRevisionController implements GameUICallback {
      * Call from FX thread or wrap with Platform.runLater.
      */
     public void refreshExperimentInventory(int knightCards, int progressCards, int vpCards) {
-        inventoryCardRow.getChildren().clear();
-        addExperimentToInventory(knightCards,   CardCategory.KNIGHT);
-        addExperimentToInventory(progressCards, CardCategory.PROGRESS);
-        addExperimentToInventory(vpCards,       CardCategory.VICTORY_POINT);
+        PlayerCardInventory fallbackInventory = new PlayerCardInventory();
+        fallbackInventory.setQuantity(CardType.KNIGHT, knightCards);
+        // Legacy fallback: when only "progress total" is known, render it under Road Building.
+        fallbackInventory.setQuantity(CardType.ROAD_BUILDING, progressCards);
+        fallbackInventory.setQuantity(CardType.VICTORY_POINT, vpCards);
+        rebuildCombinedInventory(playerResourceCounts, fallbackInventory);
     }
 
-    private void addExperimentToInventory(int count, CardCategory category) {
-        if (count <= 0) return;
-        inventoryCardRow.getChildren().add(buildExperimentCard(category, count));
+    private void refreshExperimentInventoryFromCardInventory(int playerIndex) {
+        PlayerCardInventory inventory = playerCardInventories.get(playerIndex);
+        rebuildCombinedInventory(playerResourceCounts, inventory);
+    }
+
+    private void rebuildCombinedInventory(Map<ResourceType, Integer> resourceCounts,
+                                          PlayerCardInventory inventory) {
+        if (inventoryResourceRow == null) return;
+        inventoryResourceRow.getChildren().clear();
+        resourceBadgeLabels.clear();
+        for (ResourceType type : ResourceType.values()) {
+            int count = resourceCounts.getOrDefault(type, 0);
+            if (count <= 0) continue;
+            StackPane card = buildResourceCard(type, count);
+            resourceBadgeLabels.put(type, (Label) card.getUserData());
+            inventoryResourceRow.getChildren().add(card);
+        }
+        if (inventory == null) return;
+        for (CardType type : INVENTORY_CARD_DISPLAY_ORDER) {
+            int count = inventory.getQuantity(type);
+            if (count <= 0) continue;
+            inventoryResourceRow.getChildren().add(buildExperimentCard(type, count));
+        }
+        if (inventoryCardRow != null) {
+            inventoryCardRow.getChildren().clear();
+        }
     }
 
     /**
@@ -941,39 +1113,23 @@ public class GameRevisionController implements GameUICallback {
         HBox box = playerCardBoxes.get(playerIndex);
         if (box == null) return;
         box.getChildren().clear();
-        // Hanya tampilkan Knight dan Victory Point di stats profil pemain
-        addStatusCard(box, knightCards, CardCategory.KNIGHT);
-        addStatusCard(box, vpCards,     CardCategory.VICTORY_POINT);
+        // Tampilkan indikator card utama di row player (fokus: Knight).
+        addStatusCard(box, knightCards, CardType.KNIGHT);
     }
 
-    private void addStatusCard(HBox box, int count, CardCategory category) {
+    private void addStatusCard(HBox box, int count, CardType type) {
         if (count <= 0) return;
-        StackPane card = buildSmallCard(category, count);
+        StackPane card = buildSmallCard(type, count);
         box.getChildren().add(card);
     }
 
     /** Small card variant for player status rows. */
-    private StackPane buildSmallCard(CardCategory category, int count) {
-        ImageView img = new ImageView(loadCardImage(category));
-        img.setFitWidth(53);
-        img.setFitHeight(78);
-        img.setPreserveRatio(false);
-        img.setSmooth(true);
-
-        StackPane root = new StackPane(img);
-        root.setPrefSize(26, 36);
-        root.setMaxSize(26, 36);
-
-        if (count > 1) {
-            Label badge = new Label(String.valueOf(count));
-            badge.getStyleClass().add("gr-badge-label");
-            if (arcadeFont != null) badge.setFont(Font.font(arcadeFont.getFamily(), 9));
-            StackPane.setAlignment(badge, Pos.TOP_LEFT);
-            badge.setTranslateX(2);
-            badge.setTranslateY(2);
-            root.getChildren().add(badge);
+    private StackPane buildSmallCard(CardType type, int count) {
+        CardDefinition definition = CardDefinitions.get(type);
+        if (definition == null) {
+            return new StackPane();
         }
-        return root;
+        return cardTemplateRenderer.buildCardNode(definition, count, false, false, 42, 62);
     }
 
     /**
@@ -1022,29 +1178,12 @@ public class GameRevisionController implements GameUICallback {
         return root;
     }
 
-    private StackPane buildExperimentCard(CardCategory category, int count) {
-        ImageView cardImage = new ImageView(loadCardImage(category));
-        cardImage.setFitWidth(72);   // experiment card width — edit here
-        cardImage.setFitHeight(100); // experiment card height — edit here
-        cardImage.setPreserveRatio(false);
-        cardImage.setSmooth(true);
-
-        StackPane root = new StackPane();
-        root.setPrefSize(72, 100);
-        root.setMaxSize(72, 100);
-        root.getChildren().add(cardImage);
-
-        if (count > 1) {
-            Label badge = new Label(String.valueOf(count));
-            badge.getStyleClass().add("gr-badge-label");
-            if (arcadeFont != null) badge.setFont(Font.font(arcadeFont.getFamily(), 10));
-            StackPane.setAlignment(badge, Pos.TOP_LEFT);
-            badge.setTranslateX(4);  // horizontal offset
-            badge.setTranslateY(3);  // vertical offset
-            root.getChildren().add(badge);
+    private StackPane buildExperimentCard(CardType type, int count) {
+        CardDefinition definition = CardDefinitions.get(type);
+        if (definition == null) {
+            return new StackPane();
         }
-
-        return root;
+        return cardTemplateRenderer.buildCardNode(definition, count, false, false, 86, 134);
     }
 
     private Image loadInventoryImage(ResourceType type) {
@@ -1054,16 +1193,6 @@ public class GameRevisionController implements GameUICallback {
             case WHEAT  -> "/com/bananarepublic/images/game_revision/inventory_wheat.png";
             case ORE    -> "/com/bananarepublic/images/game_revision/inventory_ore.png";
             case BANANA -> "/com/bananarepublic/images/game_revision/inventory_banana.png";
-        };
-        return new Image(getClass().getResource(path).toExternalForm());
-    }
-
-    private Image loadCardImage(CardCategory category) {
-        String path = switch (category) {
-            case KNIGHT        -> "/com/bananarepublic/images/game_revision/card_knight.png";
-            case PROGRESS      -> "/com/bananarepublic/images/game_revision/card_progress.png";
-            case VICTORY_POINT -> "/com/bananarepublic/images/game_revision/card_vp.png";
-            default            -> "/com/bananarepublic/images/game_revision/card_progress.png";
         };
         return new Image(getClass().getResource(path).toExternalForm());
     }
@@ -4037,6 +4166,9 @@ public class GameRevisionController implements GameUICallback {
         diceRolled = false;
         diceRollMode = DiceRollMode.NONE;
         hideBuildPopup();
+        if (useCardOverlayManager != null) {
+            useCardOverlayManager.hideUseCardPopup();
+        }
         advanceToNextPlayer();
         startTurnTimer(DEFAULT_TURN_SECONDS);
     }
@@ -4044,7 +4176,9 @@ public class GameRevisionController implements GameUICallback {
     private void advanceToNextPlayer() {
         List<String> names = GameSession.getPlayerNames();
         if (names.isEmpty()) return;
+        int previousPlayerIndex = activePlayerIndex;
         activePlayerIndex = (activePlayerIndex + 1) % names.size();
+        resetCardTurnFlagsForPlayer(previousPlayerIndex);
         String nextName = names.get(activePlayerIndex);
         updateTurnDisplay(nextName);
         updatePhaseDisplay(false);
@@ -4053,6 +4187,15 @@ public class GameRevisionController implements GameUICallback {
         refreshInventoryForPlayerIndex(activePlayerIndex);
 
         appendLog("─── Giliran " + nextName + " ───");
+    }
+
+    private void resetCardTurnFlagsForPlayer(int playerIndex) {
+        if (playerIndex < 0) return;
+        usedCardTracker.resetDiscoveryCardFlagForPlayer(playerIndex);
+        PlayerCardInventory inventory = playerCardInventories.get(playerIndex);
+        if (inventory != null) {
+            inventory.clearBoughtThisTurnFlagsAtEndTurn();
+        }
     }
 
     /** Load and display inventory for a given player index. Prefers live engine data. */
@@ -4074,10 +4217,8 @@ public class GameRevisionController implements GameUICallback {
                 playerResourceCounts.putAll(nonZero);
                 refreshResourceCards(nonZero);
                 // Display cards from engine
-                refreshExperimentInventory(
-                    countCards(p, model.card.CardCategory.KNIGHT),
-                    countCards(p, model.card.CardCategory.PROGRESS),
-                    countCards(p, model.card.CardCategory.VICTORY_POINT));
+                syncCardInventoriesFromEngine();
+                refreshExperimentInventoryFromCardInventory(idx);
                 return;
             }
         }
@@ -5006,10 +5147,15 @@ public class GameRevisionController implements GameUICallback {
 
     @Override
     public void onTurnChanged(Player newActivePlayer) {
+        int previousPlayerIndex = activePlayerIndex;
         activePlayerIndex = gameController != null
             ? gameController.getCurrentPlayerIdx() : (activePlayerIndex + 1) % playerCount;
+        resetCardTurnFlagsForPlayer(previousPlayerIndex);
         updateTurnDisplay(newActivePlayer.getName());
         if (gameController != null) syncAllPlayerStocksFromEngine();
+        if (useCardOverlayManager != null) {
+            useCardOverlayManager.hideUseCardPopup();
+        }
         refreshInventoryForPlayerIndex(activePlayerIndex);
         initializeBankTradeDummyData();
         appendLog("─── Giliran " + newActivePlayer.getName() + " ───");
@@ -5235,12 +5381,16 @@ public class GameRevisionController implements GameUICallback {
 
     @Override
     public void onCardBought(Player player, ExperimentCard card) {
+        int buyerIdx = getAllPlayerIndex(player);
+        CardType boughtType = CardType.fromExperimentCard(card);
+        if (boughtType != null) {
+            playerCardInventories
+                    .computeIfAbsent(buyerIdx, idx -> new PlayerCardInventory())
+                    .markCardBoughtThisTurn(boughtType);
+        }
         if (gameController != null) {
-            // Refresh the buying player's inventory
-            int buyerIdx = getAllPlayerIndex(player);
-            if (buyerIdx == activePlayerIndex) {
-                refreshInventoryForPlayerIndex(activePlayerIndex);
-            }
+            syncCardInventoriesFromEngine();
+            if (buyerIdx == activePlayerIndex) refreshInventoryForPlayerIndex(activePlayerIndex);
         } else if (player != null) {
             refreshExperimentInventory(
                 countCards(player, model.card.CardCategory.KNIGHT),
@@ -5254,10 +5404,18 @@ public class GameRevisionController implements GameUICallback {
     @Override
     public void onCardPlayed(Player player, ExperimentCard card) {
         appendLog("▶ " + player.getName() + " memainkan " + card.getCardName());
+        if (gameController != null) {
+            syncCardInventoriesFromEngine();
+            refreshInventoryForPlayerIndex(activePlayerIndex);
+        }
     }
 
     @Override
     public void onKnightPlayed(Player player) {
+        if (gameController != null) {
+            syncCardInventoriesFromEngine();
+            refreshInventoryForPlayerIndex(activePlayerIndex);
+        }
         refreshPlayerStatsAll();
         appendLog("⚔ " + player.getName() + " memainkan Knight card.");
     }
@@ -5638,6 +5796,23 @@ public class GameRevisionController implements GameUICallback {
         return true;
     }
 
+    private boolean requireUseCardAction() {
+        if (isInitialSetupPhase()) {
+            showInformationPopup("Complete initial setup first.", InformationCloseAction.RETURN_TO_GAME);
+            return false;
+        }
+        if (gameController == null) {
+            return true;
+        }
+        TurnPhase phase = gameController.getCurrentPhase();
+        if (phase != TurnPhase.ROLL_DICE && phase != TurnPhase.TRADE_BUILD) {
+            showInformationPopup("Use Card is only available during your normal turn.",
+                    InformationCloseAction.RETURN_TO_GAME);
+            return false;
+        }
+        return true;
+    }
+
     @FXML
     private void onTradeClicked() {
         if (!requireDiceRolled()) return;
@@ -5693,6 +5868,21 @@ public class GameRevisionController implements GameUICallback {
         if (!requireDiceRolled()) return;
         if (buyExperimentOverlayController == null) return;
         buyExperimentOverlayController.showOverlay();
+    }
+
+    @FXML
+    private void onUseCardClicked() {
+        if (!requireUseCardAction()) return;
+        if (useCardOverlayManager == null) {
+            showInformationPopup("Use Card system is not available.",
+                    InformationCloseAction.RETURN_TO_GAME);
+            return;
+        }
+        if (gameController != null) {
+            syncCardInventoriesFromEngine();
+        }
+        refreshInventoryForPlayerIndex(activePlayerIndex);
+        useCardOverlayManager.showUseCardPopup();
     }
 
     @FXML
