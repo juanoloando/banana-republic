@@ -1,4 +1,4 @@
-package com.bananarepublic.cards;
+package com.bananarepublic.view.card;
 
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;

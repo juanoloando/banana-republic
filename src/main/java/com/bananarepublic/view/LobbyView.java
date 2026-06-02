@@ -1,11 +1,11 @@
-package com.bananarepublic.ui.controller;
+package com.bananarepublic.view;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
 import com.bananarepublic.BananaRepublic;
-import com.bananarepublic.session.GameSession;
+import com.bananarepublic.controller.GameSession;
 
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
@@ -18,7 +18,7 @@ import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.FileChooser;
 
-public class LobbyController {
+public class LobbyView {
     private static final double DESIGN_WIDTH = 1280.0;
     private static final double DESIGN_HEIGHT = 720.0;
     private static final String NO_FILE_CHOSEN_TEXT = "No File Chosen";
@@ -167,7 +167,7 @@ public class LobbyController {
 
         // Buat GameEngine + GameController via GameFactory
         com.bananarepublic.controller.GameController gc =
-            com.bananarepublic.GameFactory.build();
+            com.bananarepublic.controller.GameFactory.build();
         GameSession.setGameController(gc);
 
         System.out.println("Start new game with " + playerCount + " players.");

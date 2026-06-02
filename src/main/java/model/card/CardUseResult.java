@@ -1,4 +1,4 @@
-package com.bananarepublic.cards;
+package model.card;
 
 public class CardUseResult {
     private final boolean success;

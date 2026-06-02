@@ -1,4 +1,4 @@
-package com.bananarepublic.ui.controller;
+package com.bananarepublic.view;
 
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
@@ -20,7 +20,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-public class BuyExperimentCardOverlayController {
+public class BuyExperimentCardOverlay {
 
     private static final double POPUP_WIDTH = 887.0;
     private static final double POPUP_HEIGHT = 1136.0;

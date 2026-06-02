@@ -13,7 +13,7 @@
 <StackPane fx:id="overlayRoot" managed="false" maxHeight="Infinity" maxWidth="Infinity" pickOnBounds="true"
            styleClass="trade-modal-root" visible="false"
            xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1"
-           fx:controller="com.bananarepublic.ui.controller.BuyExperimentCardOverlayController">
+           fx:controller="com.bananarepublic.view.BuyExperimentCardOverlay">
     <children>
         <Pane fx:id="overlayBackdrop" maxHeight="Infinity" maxWidth="Infinity" prefHeight="1080.0" prefWidth="1920.0"
               styleClass="popup-overlay"/>

@@ -1,20 +1,20 @@
-package com.bananarepublic.ui.controller;
+package com.bananarepublic.view;
 
 import com.bananarepublic.BananaRepublic;
-import com.bananarepublic.cards.CardDataProvider;
-import com.bananarepublic.cards.CardDefinition;
-import com.bananarepublic.cards.CardDefinitions;
-import com.bananarepublic.cards.CardEffectService;
-import com.bananarepublic.cards.CardTemplateRenderer;
-import com.bananarepublic.cards.CardType;
-import com.bananarepublic.cards.CardUseResult;
-import com.bananarepublic.cards.PlayerCardInventory;
-import com.bananarepublic.cards.UsedCardTracker;
-import com.bananarepublic.cards.UseCardOverlayManager;
+import com.bananarepublic.controller.CardDataProvider;
+import com.bananarepublic.view.card.CardDefinition;
+import com.bananarepublic.view.card.CardDefinitions;
+import com.bananarepublic.controller.CardEffectService;
+import com.bananarepublic.view.card.CardTemplateRenderer;
+import model.card.CardType;
+import model.card.CardUseResult;
+import model.card.PlayerCardInventory;
+import model.card.UsedCardTracker;
+import com.bananarepublic.view.card.UseCardOverlayManager;
 import com.bananarepublic.controller.GameController;
-import com.bananarepublic.controller.GameUICallback;
-import com.bananarepublic.session.GameSession;
-import com.bananarepublic.ui.renderer.HexRevisionRenderer;
+import com.bananarepublic.controller.GameViewCallback;
+import com.bananarepublic.controller.GameSession;
+import com.bananarepublic.view.renderer.HexRevisionRenderer;
 import engine.DiceResult;
 import engine.TurnPhase;
 import javafx.animation.Animation;
@@ -53,7 +53,7 @@ import java.util.function.Predicate;
 
 import java.util.*;
 
-public class GameRevisionController implements GameUICallback {
+public class GameRevisionView implements GameViewCallback {
 
     private static final double DESIGN_WIDTH  = 1920.0;
     private static final double DESIGN_HEIGHT = 1080.0;
@@ -181,11 +181,11 @@ public class GameRevisionController implements GameUICallback {
     @FXML private Button bankTradeCancelButton;
     @FXML private Button bankTradeConfirmButton;
     @FXML private StackPane buyExperimentOverlay;
-    @FXML private BuyExperimentCardOverlayController buyExperimentOverlayController;
+    @FXML private BuyExperimentCardOverlay buyExperimentOverlayController;
     @FXML private StackPane rollDiceManualOverlay;
-    @FXML private RollDiceManualOverlayController rollDiceManualOverlayController;
+    @FXML private RollDiceManualOverlay rollDiceManualOverlayController;
     @FXML private StackPane declareVictoryOverlay;
-    @FXML private DeclareVictoryOverlayController declareVictoryOverlayController;
+    @FXML private DeclareVictoryOverlay declareVictoryOverlayController;
 
     // Build popups
     @FXML private Pane      pipePopupPane;
@@ -674,7 +674,7 @@ public class GameRevisionController implements GameUICallback {
 
             @Override
             public void appendLog(String message) {
-                GameRevisionController.this.appendLog(message);
+                GameRevisionView.this.appendLog(message);
             }
 
             @Override
@@ -782,8 +782,8 @@ public class GameRevisionController implements GameUICallback {
         return true;
     }
 
-    private List<DeclareVictoryOverlayController.VictoryLeaderboardEntry> buildVictoryLeaderboardEntries() {
-        List<DeclareVictoryOverlayController.VictoryLeaderboardEntry> entries = new ArrayList<>();
+    private List<DeclareVictoryOverlay.VictoryLeaderboardEntry> buildVictoryLeaderboardEntries() {
+        List<DeclareVictoryOverlay.VictoryLeaderboardEntry> entries = new ArrayList<>();
         int totalPlayers = Math.max(1, Math.min(4, Math.max(playerCount, GameSession.getPlayerNames().size())));
 
         int[] labelVictoryPoints = {
@@ -807,7 +807,7 @@ public class GameRevisionController implements GameUICallback {
             String playerName = getPlayerNameForIndex(oneBasedIndex);
             int victoryPoints = hasRealVictoryPointData ? labelVictoryPoints[i] : dummyVictoryPoints[i];
             Image profileImage = loadVictoryProfileImage(oneBasedIndex);
-            entries.add(new DeclareVictoryOverlayController.VictoryLeaderboardEntry(
+            entries.add(new DeclareVictoryOverlay.VictoryLeaderboardEntry(
                     playerIndex,
                     playerName,
                     Math.max(0, victoryPoints),
@@ -4479,7 +4479,7 @@ public class GameRevisionController implements GameUICallback {
             model.board.HexCoordinate coord = tile.getCoordinate();
             if (coord.equals(currentRobberPos)) continue;
 
-            com.bananarepublic.ui.renderer.HexRevisionRenderer.PixelPoint center =
+            com.bananarepublic.view.renderer.HexRevisionRenderer.PixelPoint center =
                 hexRevisionRenderer.computeTileCenterPoint(coord);
 
             javafx.scene.shape.Circle zone = new javafx.scene.shape.Circle(

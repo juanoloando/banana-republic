@@ -1,6 +1,9 @@
-package com.bananarepublic.cards;
+package com.bananarepublic.controller;
 
 import model.resource.ResourceType;
+import model.card.PlayerCardInventory;
+import model.card.CardUseResult;
+import model.card.CardType;
 
 import java.util.List;
 

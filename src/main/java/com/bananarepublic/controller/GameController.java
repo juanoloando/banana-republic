@@ -30,13 +30,13 @@ public class GameController extends GameEngineAdapter {
     private final VictoryManager victoryManager = new VictoryManager();
 
     // UI callback interface — diset oleh GameRevisionController setelah initialize
-    private GameUICallback uiCallback;
+    private GameViewCallback uiCallback;
 
     public GameController(GameEngine engine) {
         this.engine = Objects.requireNonNull(engine, "GameEngine must not be null");
     }
 
-    public void setUiCallback(GameUICallback callback) {
+    public void setUiCallback(GameViewCallback callback) {
         this.uiCallback = callback;
     }
 

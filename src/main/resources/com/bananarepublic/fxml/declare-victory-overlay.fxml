@@ -11,7 +11,7 @@
 <StackPane fx:id="overlayRoot" managed="false" maxHeight="Infinity" maxWidth="Infinity" pickOnBounds="true"
            styleClass="trade-modal-root" visible="false"
            xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1"
-           fx:controller="com.bananarepublic.ui.controller.DeclareVictoryOverlayController">
+           fx:controller="com.bananarepublic.view.DeclareVictoryOverlay">
     <children>
         <StackPane fx:id="centerLayer" alignment="CENTER" pickOnBounds="false">
             <children>

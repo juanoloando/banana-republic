@@ -1,4 +1,4 @@
-package com.bananarepublic.ui.controller;
+package com.bananarepublic.view;
 
 import javafx.fxml.FXML;
 import javafx.scene.Group;
@@ -17,7 +17,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-public class DeclareVictoryOverlayController {
+public class DeclareVictoryOverlay {
 
     private static final double ASSET_WIDTH = 1998.0;
     private static final double ASSET_HEIGHT = 1124.0;

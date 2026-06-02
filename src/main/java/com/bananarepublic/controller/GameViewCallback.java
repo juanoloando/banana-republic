@@ -12,7 +12,7 @@ import model.resource.ResourceType;
  * GameController meneruskan semua engine events lewat interface ini
  * sehingga GameController tidak perlu tahu detail implementasi UI.
  */
-public interface GameUICallback {
+public interface GameViewCallback {
 
     void onPhaseChanged(TurnPhase newPhase);
     void onDiceRolled(DiceResult result);

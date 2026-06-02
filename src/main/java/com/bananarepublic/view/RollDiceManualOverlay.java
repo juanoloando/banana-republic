@@ -1,4 +1,4 @@
-package com.bananarepublic.ui.controller;
+package com.bananarepublic.view;
 
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
@@ -14,7 +14,7 @@ import javafx.scene.layout.StackPane;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
-public class RollDiceManualOverlayController {
+public class RollDiceManualOverlay {
 
     private static final double POPUP_WIDTH = 887.0;
     private static final double POPUP_HEIGHT = 722.0;

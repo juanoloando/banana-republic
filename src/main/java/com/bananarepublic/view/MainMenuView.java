@@ -1,4 +1,4 @@
-package com.bananarepublic.ui.controller;
+package com.bananarepublic.view;
 
 import com.bananarepublic.BananaRepublic;
 
@@ -7,7 +7,7 @@ import javafx.fxml.FXML;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
-public class MainMenuController {
+public class MainMenuView {
     @FXML
     private StackPane rootPane;
 

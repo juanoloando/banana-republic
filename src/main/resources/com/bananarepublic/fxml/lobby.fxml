@@ -13,7 +13,7 @@
 <StackPane xmlns="http://javafx.com/javafx"
            xmlns:fx="http://javafx.com/fxml"
            fx:id="rootPane"
-           fx:controller="com.bananarepublic.ui.controller.LobbyController"
+           fx:controller="com.bananarepublic.view.LobbyView"
            styleClass="responsive-root">
 
     <AnchorPane fx:id="designPane"
