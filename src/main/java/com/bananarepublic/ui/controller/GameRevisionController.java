@@ -236,6 +236,10 @@ public class GameRevisionController implements GameUICallback {
     // Current board — set after renderHexBoard(), used for build mode
     private Board currentBoard;
 
+    // ── Auto-roll countdown state ────────────────────────────────────
+    private Timeline autoRollTimeline;
+    private static final int AUTO_ROLL_SECONDS = 10; // detik tanpa roll → auto-roll
+
     // ── Timer state ──────────────────────────────────────────────────
     private static final int DEFAULT_TURN_SECONDS = 90;
     private Timeline timerTimeline;
@@ -523,8 +527,8 @@ public class GameRevisionController implements GameUICallback {
         loadPlayerNames();
         setupPlayerCardBoxes();
         renderHexBoard();
-        setupBoardLayers();
-        renderBuildingsAndPipesFromSave(); // render bangunan & pipe dari save data
+        setupBoardLayers();    // layers ditambahkan SETELAH tiles → urutan benar
+        renderBuildingsAndPipesFromSave();
         initInventory();
         initBankStock();
         initializeTradeState();
@@ -4006,6 +4010,33 @@ public class GameRevisionController implements GameUICallback {
         timerLabel.setText(String.format("%02d:%02d", m, s));
     }
 
+    // ── Auto-roll countdown ──────────────────────────────────────────
+
+    /**
+     * Mulai countdown AUTO_ROLL_SECONDS. Jika pemain belum roll dalam waktu itu,
+     * dadu dilempar otomatis.
+     */
+    private void startAutoRollCountdown() {
+        stopAutoRollCountdown();
+        autoRollTimeline = new Timeline(
+            new KeyFrame(Duration.seconds(AUTO_ROLL_SECONDS), e -> {
+                if (isRollDicePhase() && !diceRolled) {
+                    appendLog("⏱ Dadu dilempar otomatis (" + AUTO_ROLL_SECONDS + "s tanpa aksi).");
+                    rollDiceRandom();
+                }
+            })
+        );
+        autoRollTimeline.setCycleCount(1);
+        autoRollTimeline.play();
+    }
+
+    private void stopAutoRollCountdown() {
+        if (autoRollTimeline != null) {
+            autoRollTimeline.stop();
+            autoRollTimeline = null;
+        }
+    }
+
     // ── Dice ─────────────────────────────────────────────────────────
 
     private void startDiceAnimation() {
@@ -4161,6 +4192,7 @@ public class GameRevisionController implements GameUICallback {
     /** Core end-turn logic: stop timer, clear state, advance player, restart timer. */
     private void performEndTurn() {
         stopTimer();
+        stopAutoRollCountdown();
         exitBuildMode();
         clearDiceDisplay();
         diceRolled = false;
@@ -4435,7 +4467,11 @@ public class GameRevisionController implements GameUICallback {
 
     /** Overlays clickable highlight circles on all tiles except the current robber position. */
     private void enterRobberMoveMode() {
-        if (currentBoard == null || gameController == null) return;
+        if (currentBoard == null || gameController == null) {
+            appendLog("[DEBUG] enterRobberMoveMode: board or controller null");
+            return;
+        }
+        try {
         exitRobberMoveMode(); // clear any previous zones
         HexCoordinate currentRobberPos = gameController.getRobberPosition();
 
@@ -4464,6 +4500,11 @@ public class GameRevisionController implements GameUICallback {
                 }
             });
             circleLayer.getChildren().add(zone);
+        }
+        appendLog("[Robber] Move zones added: " + circleLayer.getChildren().stream()
+            .filter(n -> ROBBER_ZONE_TAG.equals(n.getUserData())).count());
+        } catch (Exception ex) {
+            appendLog("[ERROR] enterRobberMoveMode failed: " + ex.getMessage());
         }
     }
 
@@ -5079,10 +5120,13 @@ public class GameRevisionController implements GameUICallback {
 
         switch (newPhase) {
             case ROLL_DICE -> {
-                stopTimer();
+                // Timer mulai dari awal giliran (bukan hanya setelah dice dilempar)
+                startTurnTimer(DEFAULT_TURN_SECONDS);
+                startAutoRollCountdown();          // auto-roll jika 10 detik tidak roll
                 updatePhaseDisplay(false);
                 diceRolled = false;
                 diceRollMode = DiceRollMode.NONE;
+                clearDiceDisplay();
                 exitBuildMode();
                 exitRobberMoveMode();
                 if (previousPhase == TurnPhase.SETUP_PLACE_SECOND) {
@@ -5094,21 +5138,25 @@ public class GameRevisionController implements GameUICallback {
             }
             case TRADE_BUILD -> {
                 updatePhaseDisplay(true);
+                stopAutoRollCountdown(); // dice sudah dilempar, batalkan auto-roll
                 exitRobberMoveMode();
                 tryAutoEnterBuildMode();
-                startTurnTimer(DEFAULT_TURN_SECONDS);
+                // Timer TIDAK di-restart di sini — sudah berjalan sejak ROLL_DICE
             }
             case ROBBER_DISCARD -> {
                 stopTimer();
+                stopAutoRollCountdown();
                 openDiscardDialogSequence();
             }
             case ROBBER_MOVE -> {
+                stopAutoRollCountdown();
                 appendLog("Move Nimon Ungu to another tile.");
                 showCenteredWarning("Click a tile to place Nimon Ungu!", 4000, "#8B4513");
                 enterRobberMoveMode();
             }
             case GAME_OVER -> {
                 stopTimer();
+                stopAutoRollCountdown();
                 if (declareVictoryOverlayController != null) {
                     declareVictoryOverlayController.showDeclareVictoryScreen();
                 }
@@ -5147,6 +5195,11 @@ public class GameRevisionController implements GameUICallback {
 
     @Override
     public void onTurnChanged(Player newActivePlayer) {
+        // Sembunyikan dadu saat giliran berganti — muncul lagi hanya saat roll dipencet
+        clearDiceDisplay();
+        diceRolled = false;
+        diceRollMode = DiceRollMode.NONE;
+
         int previousPlayerIndex = activePlayerIndex;
         activePlayerIndex = gameController != null
             ? gameController.getCurrentPlayerIdx() : (activePlayerIndex + 1) % playerCount;
@@ -5163,11 +5216,15 @@ public class GameRevisionController implements GameUICallback {
 
     @Override
     public void onBuildingPlaced(Player player, int intersectionId, String buildingType) {
-        // Re-render bangunan di map dari data engine (bukan manual render di performActualBuild)
         String colorName = getPlayerColorName(getAllPlayerIndex(player));
         String type = buildingType.toLowerCase().contains("lab") ? "lab" : "pos";
         renderBuildingOnMap(intersectionId, type, colorName);
         refreshPlayerStatsAll();
+        // Sync inventory — resources sudah terpotong oleh engine
+        if (gameController != null) {
+            syncAllPlayerStocksFromEngine();
+            refreshInventoryForPlayerIndex(activePlayerIndex);
+        }
         appendLog(player.getName() + " built " + buildingType + ".");
         if (gameController != null && isInitialSetupPhase() && !"lab".equals(type)) {
             setupLastSettlementId = intersectionId;
@@ -5179,6 +5236,11 @@ public class GameRevisionController implements GameUICallback {
     public void onPipePlaced(Player player, int pathId) {
         renderPipeOnMap(pathId, getAllPlayerIndex(player));
         refreshPlayerStatsAll();
+        // Sync inventory — resources sudah terpotong oleh engine
+        if (gameController != null) {
+            syncAllPlayerStocksFromEngine();
+            refreshInventoryForPlayerIndex(activePlayerIndex);
+        }
         appendLog("🛣 " + player.getName() + " membangun pipe");
     }
 
@@ -5195,13 +5257,21 @@ public class GameRevisionController implements GameUICallback {
     @Override
     public void onRobberMoved(HexCoordinate newPosition) {
         if (currentBoard != null) {
-            // Re-render board dengan posisi robber baru
-            // setupBoardLayers() TIDAK dipanggil di sini — sudah dipanggil saat initialize
             hexRevisionRenderer.render(boardPane,
                 currentBoard.getAllTiles(), newPosition, currentBoard);
+            // render() appends tiles ke akhir boardPane → circleLayer jadi di belakang tiles
+            // Kembalikan layers ke paling depan agar circles tetap terlihat di atas tiles
+            bringLayersToFront();
         }
         appendLog("⚫ Nimon Ungu dipindah.");
-        showStealDialogIfNeeded(); // selalu tampilkan popup resource theft
+        showStealDialogIfNeeded();
+    }
+
+    /** Pindahkan semua overlay layers ke akhir boardPane (z-order paling atas). */
+    private void bringLayersToFront() {
+        circleLayer.toFront();
+        pipeLayer.toFront();
+        buildingLayer.toFront();
     }
 
     private void showStealDialogIfNeeded() {
@@ -5213,7 +5283,8 @@ public class GameRevisionController implements GameUICallback {
 
     private void showStealDialog(List<model.player.Player> candidates) {
         // Resource Theft popup — pakai Resource theft.png background
-        // Steal OPSIONAL: pemain bisa tutup dengan X tanpa mencuri
+        // Tidak ada tombol X — CONFIRM selalu di bawah frame popup
+        boolean hasCandidates = !candidates.isEmpty();
         double popupW = 1048, popupH = 753;
         double popupX = (DESIGN_WIDTH  - popupW) / 2.0;
         double popupY = (DESIGN_HEIGHT - popupH) / 2.0;
@@ -5233,7 +5304,7 @@ public class GameRevisionController implements GameUICallback {
         bg.setFitWidth(popupW); bg.setFitHeight(popupH); bg.setPreserveRatio(false);
         popup.getChildren().add(bg);
 
-        // Player candidate cards — hanya yang punya bangunan di sekitar robber
+        // Player candidate cards
         List<model.player.Player> allPlayers = gameController != null
             ? gameController.getAllPlayers() : candidates;
         java.util.Set<String> candidateNames = new java.util.HashSet<>();
@@ -5243,7 +5314,7 @@ public class GameRevisionController implements GameUICallback {
         cardRow.setAlignment(Pos.CENTER);
         double cardAreaW = popupW * 0.86;
         cardRow.setLayoutX((popupW - cardAreaW) / 2.0);
-        cardRow.setLayoutY(330);
+        cardRow.setLayoutY(310);
         cardRow.setPrefWidth(cardAreaW);
 
         model.player.Player[] selected = {null};
@@ -5258,6 +5329,24 @@ public class GameRevisionController implements GameUICallback {
         };
         List<VBox> cardViews = new ArrayList<>();
 
+        // CONFIRM button dideklarasikan dulu agar bisa di-enable/disable dari click handler
+        Button confirmBtn = new Button();
+        confirmBtn.setLayoutX(802); confirmBtn.setLayoutY(643);
+        confirmBtn.setPrefWidth(215); confirmBtn.setPrefHeight(70);
+        // Jika tidak ada kandidat: langsung aktif; jika ada kandidat: tunggu pilihan
+        confirmBtn.setOpacity(hasCandidates ? 0.0 : 0.0);
+        confirmBtn.setDisable(hasCandidates); // disabled sampai player dipilih
+        confirmBtn.getStyleClass().add("transparent-click-zone");
+
+        // Overlay semi-transparan di atas tombol CONFIRM saat belum bisa dipencet
+        // Gunakan rectangle visual untuk menunjukkan state disabled
+        javafx.scene.shape.Rectangle confirmBlocker = new javafx.scene.shape.Rectangle(
+            802, 643, 215, 70);
+        confirmBlocker.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, hasCandidates ? 0.4 : 0.0));
+        confirmBlocker.setMouseTransparent(true);
+        confirmBlocker.setUserData("confirm-blocker");
+        popup.getChildren().add(confirmBlocker);
+
         for (int i = 0; i < allPlayers.size(); i++) {
             model.player.Player p = allPlayers.get(i);
             boolean isActive    = (gameController != null
@@ -5268,7 +5357,6 @@ public class GameRevisionController implements GameUICallback {
             card.setAlignment(Pos.CENTER);
             card.setPrefWidth(130);
             card.setStyle(isCandidate ? normalStyle : disabledStyle);
-            // Simpan nama pemain di userData agar tidak bergantung pada index children
             card.setUserData(p.getName());
 
             try {
@@ -5296,7 +5384,10 @@ public class GameRevisionController implements GameUICallback {
                 final model.player.Player pFinal = p;
                 card.setOnMouseClicked(ev -> {
                     selected[0] = pFinal;
-                    // Gunakan userData (bukan children index) untuk lookup nama yang reliable
+                    // Aktifkan CONFIRM setelah pemain dipilih
+                    confirmBtn.setDisable(false);
+                    confirmBlocker.setFill(javafx.scene.paint.Color.TRANSPARENT);
+                    // Update highlight kartu
                     for (VBox cv : cardViews) {
                         String cName = (String) cv.getUserData();
                         boolean cIsCandidate = cName != null && candidateNames.contains(cName)
@@ -5312,43 +5403,30 @@ public class GameRevisionController implements GameUICallback {
         }
         popup.getChildren().add(cardRow);
 
-        // Keterangan di bawah cards
-        Label hintLabel = new Label("Steal opsional — pilih pemain atau tutup dengan ×");
-        hintLabel.setLayoutX(50); hintLabel.setLayoutY(590);
+        // Hint label
+        Label hintLabel = new Label(hasCandidates
+            ? "Pilih pemain untuk diambil resource-nya"
+            : "Tidak ada pemain di area robber — klik CONFIRM untuk lanjut");
+        hintLabel.setLayoutX(50); hintLabel.setLayoutY(595);
         hintLabel.setPrefWidth(popupW - 100); hintLabel.setAlignment(Pos.CENTER);
         hintLabel.setStyle("-fx-text-fill: #5b2e0a; -fx-font-size: 11px; -fx-alignment: center;");
         if (arcadeFont != null) hintLabel.setFont(Font.font(arcadeFont.getFamily(), 10));
         popup.getChildren().add(hintLabel);
 
-        // X close button (top-right header area)
-        Button closeBtn = new Button();
-        closeBtn.setLayoutX(947); closeBtn.setLayoutY(118);
-        closeBtn.setPrefWidth(72); closeBtn.setPrefHeight(72);
-        closeBtn.setOpacity(0.0); closeBtn.getStyleClass().add("transparent-click-zone");
-        closeBtn.setOnAction(ev -> {
-            designPane.getChildren().remove(overlay);
-            appendLog("Resource theft dilewati.");
-        });
-        popup.getChildren().add(closeBtn);
-
-        // CONFIRM button (hitbox — gambar sudah di PNG background)
-        Button confirmBtn = new Button();
-        confirmBtn.setLayoutX(802); confirmBtn.setLayoutY(643);
-        confirmBtn.setPrefWidth(215); confirmBtn.setPrefHeight(70);
-        confirmBtn.setOpacity(0.0); confirmBtn.getStyleClass().add("transparent-click-zone");
+        // CONFIRM button — aktif langsung jika tidak ada kandidat, aktif setelah pilih jika ada
         confirmBtn.setOnAction(ev -> {
-            if (selected[0] == null) {
-                hintLabel.setText("❌ Pilih pemain dulu, atau tutup dengan ×!");
-                hintLabel.setStyle("-fx-text-fill: #b7261e; -fx-font-size: 11px; -fx-alignment: center;");
-                return;
-            }
             designPane.getChildren().remove(overlay);
-            try {
-                gameController.stealFromPlayer(selected[0]);
-                // onResourceStolen callback akan update inventory kedua pemain
-            } catch (Exception ex) {
-                appendLog("Steal gagal: " + ex.getMessage());
+            if (selected[0] != null) {
+                try {
+                    gameController.stealFromPlayer(selected[0]);
+                    // onResourceStolen callback → update inventory
+                } catch (Exception ex) {
+                    appendLog("Steal gagal: " + ex.getMessage());
+                }
+            } else {
+                appendLog("Tidak ada pencurian resource.");
             }
+            // Program lanjut ke phase build — engine sudah di TRADE_BUILD setelah moveRobber
         });
         popup.getChildren().add(confirmBtn);
 
@@ -5526,13 +5604,15 @@ public class GameRevisionController implements GameUICallback {
     private java.util.Deque<model.player.Player> discardQueue = new java.util.ArrayDeque<>();
 
     private void openDiscardDialogSequence() {
-        if (gameController == null) return;
+        if (gameController == null) { appendLog("[DEBUG] openDiscardDialog: gameController null"); return; }
         discardQueue = new java.util.ArrayDeque<>(gameController.getPlayersRequiredToDiscard());
+        appendLog("[Robber] Players to discard: " + discardQueue.size());
         if (discardQueue.isEmpty()) {
-            // Nobody has >7 cards — skip discard, go straight to robber placement
-            appendLog("No players need to discard. Move Nimon Ungu.");
+            // Nobody has >7 cards — skip discard, enter robber move immediately
             showCenteredWarning("Click a tile to place Nimon Ungu!", 4000, "#8B4513");
-            enterRobberMoveMode();
+            appendLog("[Robber] No discard needed — entering robber move mode.");
+            // Platform.runLater ensures this runs after any pending engine callbacks
+            Platform.runLater(this::enterRobberMoveMode);
             return;
         }
         processNextDiscard();
@@ -5540,11 +5620,18 @@ public class GameRevisionController implements GameUICallback {
 
     private void processNextDiscard() {
         if (discardQueue.isEmpty()) {
-            // Semua player sudah discard → player aktif sekarang harus pindah robber
-            enterRobberMoveMode();
+            // Semua player sudah discard → sekarang pindah robber
+            appendLog("[Robber] All discards done — entering robber move mode.");
+            Platform.runLater(this::enterRobberMoveMode);
             return;
         }
         model.player.Player current = discardQueue.poll();
+        // Hanya panggil computeDiscardCount jika player memang perlu discard (>7 kartu)
+        if (current.getTotalResourceCount() <= 7) {
+            appendLog("[Robber] " + current.getName() + " sudah ≤7 kartu, skip discard.");
+            processNextDiscard(); // langsung next
+            return;
+        }
         int count = gameController.computeDiscardCount(current);
         appendLog("⚠ " + current.getName() + " harus buang " + count + " kartu resource.");
         showDiscardDialog(current, count, this::processNextDiscard);
