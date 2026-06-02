@@ -1,4 +1,4 @@
-package com.bananarepublic.cards;
+package model.card;
 
 import java.util.HashMap;
 import java.util.Map;

@@ -1,4 +1,4 @@
-package com.bananarepublic.cards;
+package model.card;
 
 import model.card.ExperimentCard;
 import model.card.KnightCard;

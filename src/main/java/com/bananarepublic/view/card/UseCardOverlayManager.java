@@ -1,4 +1,4 @@
-package com.bananarepublic.cards;
+package com.bananarepublic.view.card;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -12,6 +12,11 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import model.resource.ResourceType;
+import model.card.CardUseResult;
+import model.card.CardType;
+import model.card.PlayerCardInventory;
+import com.bananarepublic.controller.CardDataProvider;
+import com.bananarepublic.controller.CardEffectService;
 
 import java.util.EnumMap;
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.bananarepublic.cards;
+package com.bananarepublic.view.card;
 
 public enum PlayabilityType {
     PLAYABLE,

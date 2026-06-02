@@ -1,5 +1,8 @@
-package com.bananarepublic.cards;
+package model.card;
 
+import com.bananarepublic.view.card.CardDefinition;
+import com.bananarepublic.view.card.CardDefinitions;
+import com.bananarepublic.view.card.CardCategory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;

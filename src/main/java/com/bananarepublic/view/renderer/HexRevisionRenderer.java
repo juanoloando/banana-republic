@@ -1,4 +1,4 @@
-package com.bananarepublic.ui.renderer;
+package com.bananarepublic.view.renderer;
 
 import com.bananarepublic.BananaRepublic;
 import javafx.scene.Cursor;

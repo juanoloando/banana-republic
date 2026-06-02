@@ -1,4 +1,4 @@
-package com.bananarepublic.session;
+package com.bananarepublic.controller;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,5 +1,6 @@
-package com.bananarepublic.cards;
+package com.bananarepublic.view.card;
 
+import model.card.CardType;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;

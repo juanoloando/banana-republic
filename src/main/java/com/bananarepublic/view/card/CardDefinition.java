@@ -1,5 +1,6 @@
-package com.bananarepublic.cards;
+package com.bananarepublic.view.card;
 
+import model.card.CardType;
 public class CardDefinition {
     private final CardType type;
     private final CardCategory category;

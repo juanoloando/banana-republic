@@ -1,7 +1,7 @@
-package com.bananarepublic;
+package com.bananarepublic.controller;
 
 import com.bananarepublic.controller.GameController;
-import com.bananarepublic.session.GameSession;
+import com.bananarepublic.controller.GameSession;
 import engine.GameEngine;
 import engine.GameStateImpl;
 import model.board.Board;

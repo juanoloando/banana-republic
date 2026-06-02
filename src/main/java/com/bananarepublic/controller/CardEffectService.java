@@ -1,6 +1,13 @@
-package com.bananarepublic.cards;
+package com.bananarepublic.controller;
 
 import model.resource.ResourceType;
+import model.card.PlayerCardInventory;
+import com.bananarepublic.view.card.PlayabilityType;
+import model.card.UsedCardTracker;
+import model.card.CardUseResult;
+import model.card.CardType;
+import com.bananarepublic.view.card.CardDefinition;
+import com.bananarepublic.view.card.CardDefinitions;
 
 public class CardEffectService {
     private final CardDataProvider dataProvider;
