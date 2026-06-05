@@ -652,6 +652,9 @@ public class GameRevisionView implements GameViewCallback {
                 if (selected == null) {
                     return CardUseResult.fail("You do not have this card.");
                 }
+                if (type == CardType.KNIGHT && gameController.getCurrentPhase() == TurnPhase.ROLL_DICE) {
+                    return CardUseResult.fail("Knight card can only be played after rolling dice.");
+                }
 
                 try {
                     gameController.playCard(selected);
@@ -5245,6 +5248,7 @@ public class GameRevisionView implements GameViewCallback {
             useCardOverlayManager.hideUseCardPopup();
         }
         refreshInventoryForPlayerIndex(activePlayerIndex);
+        refreshPlayerStatsAll();
         initializeBankTradeDummyData();
         appendLog("─── Giliran " + newActivePlayer.getName() + " ───");
     }
@@ -5602,7 +5606,7 @@ public class GameRevisionView implements GameViewCallback {
                 pipes    = gameController.computeLongestRoad(p);
             }
             int vp     = gameController.computeVictoryPoints(p);
-            int knight = countCards(p, model.card.CardCategory.KNIGHT);
+            int knight = (p instanceof model.player.HumanPlayer hp) ? hp.getInventory().getKnightCardsPlayed() : 0;
             Label[] row = statLabels[i];
             if (row[0] != null) row[0].setText(String.valueOf(vp));
             if (row[1] != null) row[1].setText(String.valueOf(outposts));
@@ -5611,7 +5615,7 @@ public class GameRevisionView implements GameViewCallback {
             if (row[4] != null) row[4].setText(String.valueOf(pipes));
             playerVictoryPointsCache[i] = vp;
             refreshPlayerStatusCards(i + 1,
-                countCards(p, model.card.CardCategory.KNIGHT),
+                knight,
                 countCards(p, model.card.CardCategory.PROGRESS),
                 countCards(p, model.card.CardCategory.VICTORY_POINT));
         }

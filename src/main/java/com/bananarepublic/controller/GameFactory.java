@@ -76,7 +76,10 @@ public final class GameFactory {
         List<Player> players = new ArrayList<>();
         for (int i = 0; i < saveData.players.size(); i++) {
             SaveData.PlayerData pd = saveData.players.get(i);
-            HumanPlayer player = new HumanPlayer(pd.name, colors[i % colors.length]);
+            PlayerColor savedColor = (pd.color != null)
+                ? PlayerColor.valueOf(pd.color.toUpperCase())
+                : colors[i % colors.length];
+            HumanPlayer player = new HumanPlayer(pd.name, savedColor);
             // Restore resources
             if (pd.resources != null) {
                 pd.resources.forEach((key, val) -> {
