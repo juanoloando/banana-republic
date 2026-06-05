@@ -631,9 +631,10 @@ public class GameRevisionView implements GameViewCallback {
 
             @Override
             public boolean isRoadBuildingEffectInProgress(int playerIndex) {
-                return gameController != null
-                        && gameController.getCurrentPlayerIdx() == playerIndex
-                        && gameController.getCurrentPhase() == TurnPhase.TRADE_BUILD
+                if (gameController == null) return false;
+                if (gameController.getCurrentPlayerIdx() != playerIndex) return false;
+                TurnPhase ph = gameController.getCurrentPhase();
+                return (ph == TurnPhase.TRADE_BUILD || ph == TurnPhase.ROLL_DICE)
                         && gameController.getFreeRoadsRemaining() > 0;
             }
 
@@ -652,9 +653,6 @@ public class GameRevisionView implements GameViewCallback {
                 if (selected == null) {
                     return CardUseResult.fail("You do not have this card.");
                 }
-                if (type == CardType.KNIGHT && gameController.getCurrentPhase() == TurnPhase.ROLL_DICE) {
-                    return CardUseResult.fail("Knight card can only be played after rolling dice.");
-                }
 
                 try {
                     gameController.playCard(selected);
@@ -669,6 +667,9 @@ public class GameRevisionView implements GameViewCallback {
                     }
                     syncAllPlayerStocksFromEngine();
                     syncCardInventoriesFromEngine();
+                    if (type == CardType.ROAD_BUILDING) {
+                        tryAutoEnterBuildMode();
+                    }
                     return CardUseResult.success("Card played.", true, false);
                 } catch (RuntimeException | AssertionError e) {
                     return CardUseResult.fail(e.getMessage() == null ? "Failed to use card." : e.getMessage());
@@ -1038,11 +1039,14 @@ public class GameRevisionView implements GameViewCallback {
                         refreshResourceCards(resCounts);
                     }
                 }
-                refreshPlayerStatusCards(i + 1,
-                    pd.knightCardsInHand,
-                    pd.progressCardsInHand,
-                    pd.victoryPointCardsInHand
-                );
+                java.util.Collection<model.player.SpecialCard> savedSpecials = new java.util.ArrayList<>();
+                if (pd.heldSpecialCards != null) {
+                    for (String s : pd.heldSpecialCards) {
+                        try { savedSpecials.add(model.player.SpecialCard.valueOf(s.toUpperCase())); }
+                        catch (IllegalArgumentException ignored) {}
+                    }
+                }
+                refreshPlayerStatusCards(i + 1, savedSpecials);
             }
             // Populate stat labels (VP, Outpost, Lab, Knight, Pipe) for all players
             populatePlayerStats(saveData);
@@ -1123,18 +1127,16 @@ public class GameRevisionView implements GameViewCallback {
      * Call from FX thread or wrap with Platform.runLater.
      */
     public void refreshPlayerStatusCards(int playerIndex,
-                                          int knightCards, int progressCards, int vpCards) {
+                                          java.util.Collection<model.player.SpecialCard> specialCards) {
         HBox box = playerCardBoxes.get(playerIndex);
         if (box == null) return;
         box.getChildren().clear();
-        // Tampilkan indikator card utama di row player (fokus: Knight).
-        addStatusCard(box, knightCards, CardType.KNIGHT);
-    }
-
-    private void addStatusCard(HBox box, int count, CardType type) {
-        if (count <= 0) return;
-        StackPane card = buildSmallCard(type, count);
-        box.getChildren().add(card);
+        if (specialCards == null) return;
+        for (model.player.SpecialCard sc : specialCards) {
+            CardType type = (sc == model.player.SpecialCard.LONGEST_ROAD)
+                ? CardType.LONGEST_ROAD : CardType.LARGEST_ARMY;
+            box.getChildren().add(buildSmallCard(type, 0));
+        }
     }
 
     /** Small card variant for player status rows. */
@@ -4022,7 +4024,15 @@ public class GameRevisionView implements GameViewCallback {
             if (remainingSeconds <= 0) {
                 stopTimer();
                 appendLog("⏱ Waktu habis — giliran berakhir otomatis.");
-                performEndTurn();
+                if (gameController != null) {
+                    try {
+                        gameController.endTurn();
+                    } catch (Exception | AssertionError ex) {
+                        performEndTurn();
+                    }
+                } else {
+                    performEndTurn();
+                }
             }
         }));
         timerTimeline.setCycleCount(Timeline.INDEFINITE);
@@ -4226,10 +4236,6 @@ public class GameRevisionView implements GameViewCallback {
     private void performEndTurn() {
         stopTimer();
         stopAutoRollCountdown();
-        // Stop dice animation so the engine isn't left mid-roll
-        if (diceTimeline != null && diceTimeline.getStatus() == Animation.Status.RUNNING) {
-            diceTimeline.stop();
-        }
         exitBuildMode();
         clearDiceDisplay();
         diceRolled = false;
@@ -4238,30 +4244,8 @@ public class GameRevisionView implements GameViewCallback {
         if (useCardOverlayManager != null) {
             useCardOverlayManager.hideUseCardPopup();
         }
-
-        if (gameController != null) {
-            try {
-                TurnPhase phase = gameController.getCurrentPhase();
-                if (phase == TurnPhase.ROLL_DICE) {
-                    // Auto-roll to move the engine past ROLL_DICE into TRADE_BUILD
-                    gameController.rollDice();
-                    phase = gameController.getCurrentPhase();
-                }
-                if (phase == TurnPhase.TRADE_BUILD) {
-                    // Engine fires onTurnChanged + onPhaseChanged(ROLL_DICE) via Platform.runLater,
-                    // which restarts the timer and advances the UI to the next player automatically.
-                    gameController.endTurn();
-                }
-                // For SETUP or ROBBER phases the normal flow continues; no forced end.
-            } catch (Exception e) {
-                appendLog("⚠ Auto end turn gagal: " + e.getMessage());
-                advanceToNextPlayer();
-                startTurnTimer(DEFAULT_TURN_SECONDS);
-            }
-        } else {
-            advanceToNextPlayer();
-            startTurnTimer(DEFAULT_TURN_SECONDS);
-        }
+        advanceToNextPlayer();
+        startTurnTimer(DEFAULT_TURN_SECONDS);
     }
 
     private void advanceToNextPlayer() {
@@ -4453,8 +4437,18 @@ public class GameRevisionView implements GameViewCallback {
 
         if (gameController != null) {
             // ── Pakai BuildValidator via bridge — validasi nyata dari engine ──
-            // Distance rule, connectivity, lab-hanya-dari-outpost, resource check
             TurnPhase phase = gameController.getCurrentPhase();
+
+            // Road Building card played before rolling dice: show pipes only
+            if (phase == TurnPhase.ROLL_DICE && gameController.getFreeRoadsRemaining() > 0) {
+                Player activePlayer = gameController.getActivePlayer();
+                Set<Integer> freePipeIds = gameController.getValidPipeIds(activePlayer);
+                appendLog("[Build] pipe=" + freePipeIds.size() + " (Road Building pre-roll)");
+                enterBuildMode(java.util.Collections.emptySet(), java.util.Collections.emptySet(),
+                        freePipeIds, currentBoard);
+                return;
+            }
+
             if (phase != TurnPhase.TRADE_BUILD
                 && phase != TurnPhase.SETUP_PLACE_FIRST
                 && phase != TurnPhase.SETUP_PLACE_SECOND) return;
@@ -4740,10 +4734,9 @@ public class GameRevisionView implements GameViewCallback {
         SaveData saveData = GameSession.getLoadedSaveData();
         if (saveData == null || saveData.players == null) return;
 
-        String[] colorNames = {"red", "blue", "green", "yellow"};
         for (int i = 0; i < saveData.players.size(); i++) {
             SaveData.PlayerData pd = saveData.players.get(i);
-            String colorName = colorNames[i % colorNames.length];
+            String colorName = (pd.color != null) ? pd.color.toLowerCase() : getPlayerColorName(i);
 
             // Render bangunan (outpost / lab)
             if (pd.buildings != null) {
@@ -5188,6 +5181,11 @@ public class GameRevisionView implements GameViewCallback {
                 clearDiceDisplay();
                 exitBuildMode();
                 exitRobberMoveMode();
+                if (gameController != null) {
+                    activePlayerIndex = gameController.getCurrentPlayerIdx();
+                    refreshInventoryForPlayerIndex(activePlayerIndex);
+                    refreshPlayerStatsAll();
+                }
                 if (previousPhase == TurnPhase.SETUP_PLACE_SECOND) {
                     appendLog("Initial setup complete. Normal turns begin.");
                     if (gameController != null) {
@@ -5303,12 +5301,14 @@ public class GameRevisionView implements GameViewCallback {
     public void onPipePlaced(Player player, int pathId) {
         renderPipeOnMap(pathId, getAllPlayerIndex(player));
         refreshPlayerStatsAll();
-        // Sync inventory — resources sudah terpotong oleh engine
         if (gameController != null) {
             syncAllPlayerStocksFromEngine();
             refreshInventoryForPlayerIndex(activePlayerIndex);
             refreshBankPanel(gameController.getBank());
             initializeBankTradeDummyData();
+            if (gameController.getFreeRoadsRemaining() > 0) {
+                tryAutoEnterBuildMode();
+            }
         }
         appendLog("🛣 " + player.getName() + " membangun pipe");
     }
@@ -5578,7 +5578,6 @@ public class GameRevisionView implements GameViewCallback {
     @Override
     public void onTimerExpired(Player playerWhoTimedOut) {
         appendLog("⏱ Waktu habis untuk " + playerWhoTimedOut.getName());
-        performEndTurn();
     }
 
     @Override
@@ -5625,14 +5624,14 @@ public class GameRevisionView implements GameViewCallback {
         int limit = Math.min(players.size(), 4);
         for (int i = 0; i < limit; i++) {
             model.player.Player p = players.get(i);
-            int outposts = 0, labs = 0, pipes = 0;
+            int outposts = 0, labs = 0, pipes = 0, knight = 0;
             if (p instanceof model.player.HumanPlayer hp) {
                 outposts = model.player.HumanPlayer.MAX_SETTLEMENTS - hp.getSettlementsInSupply();
                 labs     = model.player.HumanPlayer.MAX_LABORATORIES - hp.getLaboratoriesInSupply();
                 pipes    = gameController.computeLongestRoad(p);
+                knight   = hp.getInventory().getKnightCardsPlayed();
             }
-            int vp     = gameController.computeVictoryPoints(p);
-            int knight = (p instanceof model.player.HumanPlayer hp) ? hp.getInventory().getKnightCardsPlayed() : 0;
+            int vp = gameController.computeVictoryPoints(p);
             Label[] row = statLabels[i];
             if (row[0] != null) row[0].setText(String.valueOf(vp));
             if (row[1] != null) row[1].setText(String.valueOf(outposts));
@@ -5640,10 +5639,10 @@ public class GameRevisionView implements GameViewCallback {
             if (row[3] != null) row[3].setText(String.valueOf(knight));
             if (row[4] != null) row[4].setText(String.valueOf(pipes));
             playerVictoryPointsCache[i] = vp;
-            refreshPlayerStatusCards(i + 1,
-                knight,
-                countCards(p, model.card.CardCategory.PROGRESS),
-                countCards(p, model.card.CardCategory.VICTORY_POINT));
+            java.util.Collection<model.player.SpecialCard> specials = (p instanceof model.player.HumanPlayer hpSc)
+                ? hpSc.getHeldSpecialCards()
+                : java.util.Collections.emptySet();
+            refreshPlayerStatusCards(i + 1, specials);
         }
     }
 

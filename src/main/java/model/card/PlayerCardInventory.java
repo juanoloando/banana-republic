@@ -6,14 +6,12 @@ import com.bananarepublic.view.card.CardCategory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class PlayerCardInventory {
     private final EnumMap<CardType, Integer> quantities = new EnumMap<>(CardType.class);
-    private final Set<CardType> boughtThisTurn = EnumSet.noneOf(CardType.class);
+    private final EnumMap<CardType, Integer> boughtThisTurnCount = new EnumMap<>(CardType.class);
 
     public PlayerCardInventory() {
         for (CardType type : CardType.values()) {
@@ -47,15 +45,15 @@ public class PlayerCardInventory {
     }
 
     public void markCardBoughtThisTurn(CardType type) {
-        boughtThisTurn.add(type);
+        boughtThisTurnCount.merge(type, 1, Integer::sum);
     }
 
     public boolean isBoughtThisTurn(CardType type) {
-        return boughtThisTurn.contains(type);
+        return boughtThisTurnCount.getOrDefault(type, 0) >= getQuantity(type);
     }
 
     public void clearBoughtThisTurnFlagsAtEndTurn() {
-        boughtThisTurn.clear();
+        boughtThisTurnCount.clear();
     }
 
     public boolean canUseThisTurn(CardType type) {

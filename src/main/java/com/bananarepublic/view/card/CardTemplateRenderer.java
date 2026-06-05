@@ -38,9 +38,11 @@ public class CardTemplateRenderer {
         titleLabel.setStyle("-fx-text-fill: #2f1f12; -fx-font-size: " + titleFontSize + "px; -fx-font-weight: bold;"
                 + "-fx-effect: dropshadow(gaussian, rgba(255,255,255,0.32), 1, 0.2, 0, 0);");
 
-        double qtyFontSize = Math.max(8, Math.min(11, height * 0.055));
-        Label qtyLabel = new Label("x" + quantity);
-        qtyLabel.setStyle("-fx-text-fill: #3f2d17; -fx-font-size: " + qtyFontSize + "px; -fx-font-weight: bold;");
+        double qtyFontSize = Math.max(12, Math.min(16, height * 0.10));
+        Label qtyLabel = new Label(String.valueOf(quantity));
+        qtyLabel.setStyle("-fx-text-fill: white; -fx-font-size: " + qtyFontSize + "px; -fx-font-weight: bold;"
+                + "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 2, 0.5, 0, 0);");
+        boolean isSpecial = definition.getCategory() == CardCategory.SPECIAL;
 
         StackPane root = new StackPane(cardTemplate);
         root.setPrefSize(width, height);
@@ -53,10 +55,12 @@ public class CardTemplateRenderer {
         titleLabel.setTranslateY(-Math.max(8, height * 0.10));
         root.getChildren().add(titleLabel);
 
-        StackPane.setAlignment(qtyLabel, Pos.TOP_LEFT);
-        qtyLabel.setTranslateX(Math.max(4, width * 0.06));
-        qtyLabel.setTranslateY(Math.max(3, height * 0.03));
-        root.getChildren().add(qtyLabel);
+        if (!isSpecial && quantity > 0) {
+            StackPane.setAlignment(qtyLabel, Pos.TOP_LEFT);
+            qtyLabel.setTranslateX(Math.max(4, width * 0.06));
+            qtyLabel.setTranslateY(Math.max(3, height * 0.03));
+            root.getChildren().add(qtyLabel);
+        }
 
         if (disabled) {
             root.setOpacity(0.50);

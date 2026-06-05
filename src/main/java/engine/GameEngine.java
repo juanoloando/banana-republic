@@ -293,10 +293,6 @@ public class GameEngine {
         assert !cardPlayedThisTurn
                 : "Only one card can be played per turn";
 
-        if (card instanceof KnightCard && state.getCurrentPhase() != TurnPhase.TRADE_BUILD) {
-            throw new IllegalStateException("Knight card can only be played after rolling dice.");
-        }
-
         Player player = state.getActivePlayer();
         if (player instanceof HumanPlayer) {
             assert ((HumanPlayer) player).getInventory().getCards().contains(card)
