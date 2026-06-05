@@ -4737,6 +4737,7 @@ public class GameRevisionView implements GameViewCallback {
 
     private static final String BUILT_TAG = "built-structure";
     private static final double PIPE_THICKNESS = 14.0;
+    private static final double PIPE_OUTLINE_EXTRA = 4.0;
 
     private void renderBuildingOnMap(int intersectionId, String type, String colorName) {
         if (currentBoard == null) return;
@@ -4777,6 +4778,18 @@ public class GameRevisionView implements GameViewCallback {
         double cx = (a.x() + b.x()) / 2.0;
         double cy = (a.y() + b.y()) / 2.0;
 
+        double outlineThickness = PIPE_THICKNESS + PIPE_OUTLINE_EXTRA;
+        double outlineLength = len + PIPE_OUTLINE_EXTRA;
+
+        javafx.scene.shape.Rectangle pipeOutline = new javafx.scene.shape.Rectangle(outlineLength, outlineThickness);
+        pipeOutline.setFill(javafx.scene.paint.Color.BLACK);
+        pipeOutline.setArcWidth(outlineThickness);
+        pipeOutline.setArcHeight(outlineThickness);
+        pipeOutline.setLayoutX(cx - outlineLength / 2.0);
+        pipeOutline.setLayoutY(cy - outlineThickness / 2.0);
+        pipeOutline.setRotate(angle);
+        pipeOutline.setUserData(BUILT_TAG);
+
         javafx.scene.shape.Rectangle pipe = new javafx.scene.shape.Rectangle(len, PIPE_THICKNESS);
         pipe.setFill(getPlayerJavafxColor(playerIdx));
         pipe.setArcWidth(PIPE_THICKNESS);
@@ -4785,6 +4798,7 @@ public class GameRevisionView implements GameViewCallback {
         pipe.setLayoutY(cy - PIPE_THICKNESS / 2.0);
         pipe.setRotate(angle);
         pipe.setUserData(BUILT_TAG);
+        pipeLayer.getChildren().add(pipeOutline);
         pipeLayer.getChildren().add(pipe); // middle layer → above circles, below buildings
     }
 
@@ -5377,15 +5391,6 @@ public class GameRevisionView implements GameViewCallback {
         confirmBtn.setDisable(hasCandidates); // disabled sampai player dipilih
         confirmBtn.getStyleClass().add("transparent-click-zone");
 
-        // Overlay semi-transparan di atas tombol CONFIRM saat belum bisa dipencet
-        // Gunakan rectangle visual untuk menunjukkan state disabled
-        javafx.scene.shape.Rectangle confirmBlocker = new javafx.scene.shape.Rectangle(
-            802, 643, 215, 70);
-        confirmBlocker.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, hasCandidates ? 0.4 : 0.0));
-        confirmBlocker.setMouseTransparent(true);
-        confirmBlocker.setUserData("confirm-blocker");
-        popup.getChildren().add(confirmBlocker);
-
         for (int i = 0; i < allPlayers.size(); i++) {
             model.player.Player p = allPlayers.get(i);
             boolean isActive    = (gameController != null
@@ -5425,7 +5430,6 @@ public class GameRevisionView implements GameViewCallback {
                     selected[0] = pFinal;
                     // Aktifkan CONFIRM setelah pemain dipilih
                     confirmBtn.setDisable(false);
-                    confirmBlocker.setFill(javafx.scene.paint.Color.TRANSPARENT);
                     // Update highlight kartu
                     for (VBox cv : cardViews) {
                         String cName = (String) cv.getUserData();
