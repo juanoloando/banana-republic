@@ -72,22 +72,48 @@ public class StandardMapGenerator implements MapGenerator {
     }
 
     private List<Harbor> createHarbors(List<Intersection> intersections) {
-        List<Harbor> harbors = new ArrayList<>();
-        harbors.add(new Harbor(HarborType.GENERAL, 0,  1));
-        harbors.add(new Harbor(HarborType.WOOD,3,  7));
-        harbors.add(new Harbor(HarborType.BANANA,12, 18));
-        harbors.add(new Harbor(HarborType.GENERAL, 22, 27));
-        harbors.add(new Harbor(HarborType.ORE, 33, 38));
-        harbors.add(new Harbor(HarborType.GENERAL, 42, 47));
-        harbors.add(new Harbor(HarborType.WHEAT, 48, 49));
-        harbors.add(new Harbor(HarborType.BRICK, 50, 51));
-        harbors.add(new Harbor(HarborType.GENERAL, 52, 53));
+        // Harbor tile coordinates match the visual HARBOR_BOX_CENTERS positions in HexRevisionRenderer
+        HexCoordinate[] harborTiles = {
+            new HexCoordinate(1, -2),   // GENERAL  (top)
+            new HexCoordinate(-1, -1),  // WOOD     (upper-left)
+            new HexCoordinate(2, -1),   // BANANA   (upper-right)
+            new HexCoordinate(-2, 0),   // GENERAL  (left)
+            new HexCoordinate(2, 0),    // ORE      (right)
+            new HexCoordinate(-2, 1),   // GENERAL  (lower-left)
+            new HexCoordinate(1, 1),    // WHEAT    (lower-right)
+            new HexCoordinate(-2, 2),   // BRICK    (bottom-left)
+            new HexCoordinate(0, 2),    // GENERAL  (bottom-right)
+        };
+        HarborType[] harborTypes = {
+            HarborType.GENERAL, HarborType.WOOD,    HarborType.BANANA,
+            HarborType.GENERAL, HarborType.ORE,     HarborType.GENERAL,
+            HarborType.WHEAT,   HarborType.BRICK,   HarborType.GENERAL
+        };
 
-        for (Harbor harbor : harbors) {
-            intersections.stream()
-                .filter(i -> i.getId() == harbor.getIntersectionIdA()
-                          || i.getId() == harbor.getIntersectionIdB())
-                .forEach(i -> i.setHarbor(harbor));
+        List<Harbor> harbors = new ArrayList<>();
+        for (int h = 0; h < harborTiles.length; h++) {
+            HexCoordinate tileCoord = harborTiles[h];
+            HarborType type = harborTypes[h];
+
+            // Coastal intersections: adjacent to this harbor tile AND adj count < 3
+            List<Intersection> coastal = new ArrayList<>();
+            for (Intersection inter : intersections) {
+                List<HexCoordinate> adj = inter.getAdjacentTileCoords();
+                if (adj.contains(tileCoord) && adj.size() < 3) {
+                    coastal.add(inter);
+                }
+            }
+            if (coastal.size() < 2) continue;
+
+            // Sort outermost first (adj==1 before adj==2)
+            coastal.sort(Comparator.comparingInt(i -> i.getAdjacentTileCoords().size()));
+
+            Harbor harbor = new Harbor(type, coastal.get(0).getId(), coastal.get(1).getId());
+            harbors.add(harbor);
+            // Mark ALL coastal intersections of this harbor tile so any building grants access
+            for (Intersection inter : coastal) {
+                inter.setHarbor(harbor);
+            }
         }
         return harbors;
     }

@@ -727,23 +727,23 @@ public class GameRevisionView implements GameViewCallback {
         return isTradeBuildPhase();
     }
 
-    private boolean applyBuyExperimentCardCost() {
+    private model.card.ExperimentCard applyBuyExperimentCardCost() {
         if (gameController != null) {
             try {
-                gameController.buyExperimentCard();
+                model.card.ExperimentCard card = gameController.buyExperimentCard();
                 // Engine fires onCardBought callback → refreshes inventory + stats
                 syncAllPlayerStocksFromEngine();
                 initializeBankTradeDummyData();
-                return true;
+                return card;
             } catch (Exception e) {
                 appendLog("Cannot buy card: " + e.getMessage());
-                return false;
+                return null;
             }
         }
         // Fallback: no engine — update local stocks only
-        if (getResourceAmount(activePlayerIndex, ResourceType.ORE) < 1) return false;
-        if (getResourceAmount(activePlayerIndex, ResourceType.BANANA) < 1) return false;
-        if (getResourceAmount(activePlayerIndex, ResourceType.WHEAT) < 1) return false;
+        if (getResourceAmount(activePlayerIndex, ResourceType.ORE) < 1) return null;
+        if (getResourceAmount(activePlayerIndex, ResourceType.BANANA) < 1) return null;
+        if (getResourceAmount(activePlayerIndex, ResourceType.WHEAT) < 1) return null;
         addResourceAmount(activePlayerIndex, ResourceType.ORE, -1);
         addResourceAmount(activePlayerIndex, ResourceType.BANANA, -1);
         addResourceAmount(activePlayerIndex, ResourceType.WHEAT, -1);
@@ -752,7 +752,7 @@ public class GameRevisionView implements GameViewCallback {
         addBankResourceAmount(ResourceType.WHEAT, 1);
         syncTradeStateBackToSaveData();
         initializeBankTradeDummyData();
-        return true;
+        return model.card.CardFactory.createKnight();
     }
 
     private void setupRollDiceManualOverlay() {

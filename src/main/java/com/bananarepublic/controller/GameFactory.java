@@ -34,7 +34,7 @@ public final class GameFactory {
         List<String> names = GameSession.getPlayerNames();
 
         // ── Players ───────────────────────────────────────────────────
-        PlayerColor[] colors = PlayerColor.values(); // RED, BLUE, GREEN, YELLOW
+        PlayerColor[] colors = { PlayerColor.YELLOW, PlayerColor.BLUE, PlayerColor.RED, PlayerColor.GREEN };
         List<Player> players = new ArrayList<>();
         for (int i = 0; i < names.size(); i++) {
             players.add(new HumanPlayer(names.get(i), colors[i % colors.length]));
@@ -72,7 +72,7 @@ public final class GameFactory {
      */
     public static GameController buildFromSave(SaveData saveData) {
         // ── Players dari save ─────────────────────────────────────────
-        PlayerColor[] colors = PlayerColor.values();
+        PlayerColor[] colors = { PlayerColor.YELLOW, PlayerColor.BLUE, PlayerColor.RED, PlayerColor.GREEN };
         List<Player> players = new ArrayList<>();
         for (int i = 0; i < saveData.players.size(); i++) {
             SaveData.PlayerData pd = saveData.players.get(i);
@@ -191,6 +191,22 @@ public final class GameFactory {
                 && saveData.currentPlayerIndex < players.size()) {
             state.setCurrentPlayerIndex(saveData.currentPlayerIndex);
         }
+
+        // Restore special card holders and lengths
+        if (saveData.longestRoadHolder != null) {
+            players.stream()
+                .filter(p -> p.getName().equals(saveData.longestRoadHolder))
+                .findFirst()
+                .ifPresent(p -> state.grantSpecialCard(model.player.SpecialCard.LONGEST_ROAD, p));
+        }
+        if (saveData.largestArmyHolder != null) {
+            players.stream()
+                .filter(p -> p.getName().equals(saveData.largestArmyHolder))
+                .findFirst()
+                .ifPresent(p -> state.grantSpecialCard(model.player.SpecialCard.LARGEST_ARMY, p));
+        }
+        if (saveData.currentLongestRoadLength > 0) state.setLongestRoadLength(saveData.currentLongestRoadLength);
+        if (saveData.currentLargestArmySize > 0) state.setLargestArmySize(saveData.currentLargestArmySize);
 
         GameEngine engine = new GameEngine(state);
         GameController controller = new GameController(engine);
