@@ -2,20 +2,26 @@ package com.bananarepublic.view;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.bananarepublic.BananaRepublic;
 import com.bananarepublic.controller.GameSession;
 
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
+import javafx.scene.Node;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 
 public class LobbyView {
@@ -51,19 +57,35 @@ public class LobbyView {
     private Label environmentFileLabel;
 
     @FXML
-    private Label automationFileLabel;
+    private Button player1BotButton;
+
+    @FXML
+    private Button player2BotButton;
+
+    @FXML
+    private Button player3BotButton;
+
+    @FXML
+    private Button player4BotButton;
+
+    @FXML
+    private Node player4RowCover;
+
+    @FXML
+    private VBox automationInfoBox;
 
     private final ToggleGroup playerCountGroup = new ToggleGroup();
+    private final Map<Integer, File> selectedBotPluginFiles = new HashMap<>();
 
     private File environmentDataFile;
-    private File automationIntelligenceFile;
 
     @FXML
     public void initialize() {
         setupResponsiveScaling();
         setupPlayerCountToggle();
         setupDefaultNames();
-        setupDefaultPluginLabels();
+        setupPlayerNameListeners();
+        setupDefaultLobbyInfo();
     }
 
     private void setupResponsiveScaling() {
@@ -98,18 +120,24 @@ public class LobbyView {
         player4NameField.setText("Toto");
     }
 
-    private void setupDefaultPluginLabels() {
+    private void setupPlayerNameListeners() {
+        player1NameField.textProperty().addListener((obs, oldName, newName) -> updateAutomationInfo());
+        player2NameField.textProperty().addListener((obs, oldName, newName) -> updateAutomationInfo());
+        player3NameField.textProperty().addListener((obs, oldName, newName) -> updateAutomationInfo());
+        player4NameField.textProperty().addListener((obs, oldName, newName) -> updateAutomationInfo());
+    }
+
+    private void setupDefaultLobbyInfo() {
         environmentFileLabel.setText(NO_FILE_CHOSEN_TEXT);
-        automationFileLabel.setText(NO_FILE_CHOSEN_TEXT);
         environmentFileLabel.setTooltip(null);
-        automationFileLabel.setTooltip(null);
+        updateAutomationInfo();
     }
 
     private void updatePlayerCount(int count) {
-        boolean useFourPlayers = count == 4;
-
-        player4NameField.setDisable(!useFourPlayers);
-        player4NameField.setOpacity(useFourPlayers ? 1.0 : 0.45);
+        updatePlayerRowsVisibility();
+        clearInactivePlayerData();
+        updateBotButtonsState();
+        updateAutomationInfo();
     }
 
     @FXML
@@ -129,19 +157,50 @@ public class LobbyView {
     }
 
     @FXML
-    private void onAutomationIntelligenceClicked() {
+    private void onPlayer1BotClicked() {
+        onPlayerBotButtonClicked(0);
+    }
+
+    @FXML
+    private void onPlayer2BotClicked() {
+        onPlayerBotButtonClicked(1);
+    }
+
+    @FXML
+    private void onPlayer3BotClicked() {
+        onPlayerBotButtonClicked(2);
+    }
+
+    @FXML
+    private void onPlayer4BotClicked() {
+        onPlayerBotButtonClicked(3);
+    }
+
+    private void onPlayerBotButtonClicked(int playerIndex) {
+        System.out.println("Bot button clicked for player " + (playerIndex + 1));
+
+        if (playerIndex >= getSelectedPlayerCount()) {
+            return;
+        }
+
+        chooseBotPluginForPlayer(playerIndex);
+    }
+
+    private void chooseBotPluginForPlayer(int playerIndex) {
         File selectedFile = chooseJarFile("Choose Automation Intelligence Plugin");
         if (selectedFile == null) {
             return;
         }
 
-        automationIntelligenceFile = selectedFile;
-        automationFileLabel.setText(shortenFileName(selectedFile.getName()));
-        automationFileLabel.setTooltip(new Tooltip(selectedFile.getAbsolutePath()));
+        selectedBotPluginFiles.put(playerIndex, selectedFile);
+        String playerName = getPlayerNameField(playerIndex).getText().trim();
 
-        System.out.println("Automation Intelligence plugin selected: " + selectedFile.getAbsolutePath());
+        System.out.println("Selected bot for " + playerName + ": " + selectedFile.getName());
 
-        // TODO: sambungkan ke BotPluginLoader dari anggota 3.
+        updateBotButtonsState();
+        updateAutomationInfo();
+
+        // TODO: sambungkan path bot per player ini ke BotPluginLoader dari anggota 3.
     }
 
     @FXML
@@ -153,16 +212,15 @@ public class LobbyView {
             return;
         }
 
-        List<String> names = new ArrayList<>();
-        names.add(player1NameField.getText().trim());
-        names.add(player2NameField.getText().trim());
-        names.add(player3NameField.getText().trim());
-
-        if (playerCount == 4) {
-            names.add(player4NameField.getText().trim());
+        List<String> names = getActivePlayerNames();
+        if (!areSelectedBotFilesValid(names)) {
+            return;
         }
 
+        Map<Integer, String> botPluginPaths = getActiveBotPluginPaths();
+
         GameSession.setPlayerNames(names);
+        GameSession.setPlayerBotPluginPaths(botPluginPaths);
         GameSession.clearLoadedSaveData();
 
         // Buat GameEngine + GameController via GameFactory
@@ -172,6 +230,7 @@ public class LobbyView {
 
         System.out.println("Start new game with " + playerCount + " players.");
         System.out.println("Players: " + names);
+        System.out.println("Starting game with bot plugins: " + botPluginPaths);
 
         BananaRepublic.showGame();
     }
@@ -205,6 +264,43 @@ public class LobbyView {
         return (int) playerCountGroup.getSelectedToggle().getUserData();
     }
 
+    private List<String> getActivePlayerNames() {
+        int playerCount = getSelectedPlayerCount();
+        List<String> names = new ArrayList<>();
+
+        for (int i = 0; i < playerCount; i++) {
+            names.add(getPlayerNameField(i).getText().trim());
+        }
+
+        return names;
+    }
+
+    private Map<Integer, String> getActiveBotPluginPaths() {
+        int playerCount = getSelectedPlayerCount();
+        Map<Integer, String> botPluginPaths = new LinkedHashMap<>();
+
+        for (int i = 0; i < playerCount; i++) {
+            File botFile = selectedBotPluginFiles.get(i);
+            if (botFile != null) {
+                botPluginPaths.put(i, botFile.getAbsolutePath());
+            }
+        }
+
+        return botPluginPaths;
+    }
+
+    private boolean areSelectedBotFilesValid(List<String> names) {
+        for (int i = 0; i < names.size(); i++) {
+            File botFile = selectedBotPluginFiles.get(i);
+            if (botFile != null && !botFile.exists()) {
+                showWarning("Bot plugin file for " + names.get(i) + " cannot be found.");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private boolean isValidPlayerSetup(int playerCount) {
         if (isBlank(player1NameField.getText())) return false;
         if (isBlank(player2NameField.getText())) return false;
@@ -217,8 +313,88 @@ public class LobbyView {
         return value == null || value.trim().isEmpty();
     }
 
-    private String getFilePathOrDefault(File file, String defaultValue) {
-        return file == null ? defaultValue : file.getAbsolutePath();
+    private void updateBotButtonsState() {
+        int playerCount = getSelectedPlayerCount();
+
+        for (int i = 0; i < 4; i++) {
+            Button botButton = getBotButton(i);
+            boolean active = i < playerCount;
+            boolean selected = selectedBotPluginFiles.containsKey(i);
+
+            botButton.setDisable(!active);
+            botButton.setVisible(active);
+            botButton.setManaged(active);
+            botButton.setOpacity(1.0);
+            botButton.getStyleClass().remove("robot-button-selected");
+
+            if (selected) {
+                botButton.getStyleClass().add("robot-button-selected");
+            }
+        }
+    }
+
+    private void updateAutomationInfo() {
+        automationInfoBox.getChildren().clear();
+        int playerCount = getSelectedPlayerCount();
+
+        for (int i = 0; i < playerCount; i++) {
+            String playerName = getPlayerNameField(i).getText().trim();
+            File botFile = selectedBotPluginFiles.get(i);
+            String botName = botFile == null ? "No bot" : shortenFileName(botFile.getName());
+            Label botInfoLabel = new Label(playerName + ": " + botName);
+
+            botInfoLabel.setMaxWidth(Double.MAX_VALUE);
+            botInfoLabel.getStyleClass().add("automation-info-text");
+            automationInfoBox.getChildren().add(botInfoLabel);
+        }
+    }
+
+    private void updatePlayerRowsVisibility() {
+        int playerCount = getSelectedPlayerCount();
+
+        for (int i = 0; i < 4; i++) {
+            boolean active = i < playerCount;
+            TextField playerNameField = getPlayerNameField(i);
+
+            playerNameField.setDisable(!active);
+            playerNameField.setVisible(active);
+            playerNameField.setManaged(active);
+            playerNameField.setOpacity(1.0);
+        }
+
+        boolean hidePlayer4Row = playerCount == 3;
+        player4RowCover.setVisible(hidePlayer4Row);
+        player4RowCover.setManaged(hidePlayer4Row);
+    }
+
+    private void clearInactivePlayerData() {
+        int playerCount = getSelectedPlayerCount();
+
+        for (int i = playerCount; i < 4; i++) {
+            if (selectedBotPluginFiles.remove(i) != null) {
+                System.out.println("Cleared bot for inactive player " + (i + 1));
+            }
+        }
+    }
+
+    private TextField getPlayerNameField(int playerIndex) {
+        return switch (playerIndex) {
+            case 0 -> player1NameField;
+            case 1 -> player2NameField;
+            case 2 -> player3NameField;
+            case 3 -> player4NameField;
+            default -> throw new IllegalArgumentException("Unknown player index: " + playerIndex);
+        };
+    }
+
+    private Button getBotButton(int playerIndex) {
+        return switch (playerIndex) {
+            case 0 -> player1BotButton;
+            case 1 -> player2BotButton;
+            case 2 -> player3BotButton;
+            case 3 -> player4BotButton;
+            default -> throw new IllegalArgumentException("Unknown player index: " + playerIndex);
+        };
     }
 
     private String shortenFileName(String fileName) {

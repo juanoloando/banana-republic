@@ -171,6 +171,68 @@
     -fx-opacity: 0.45;
 }
 
+.robot-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.robot-button:hover {
+    -fx-opacity: 0.85;
+}
+
+.robot-button:pressed {
+    -fx-opacity: 0.7;
+}
+
+.robot-button:selected,
+.robot-button-selected {
+    -fx-effect: dropshadow(gaussian, rgba(255, 225, 82, 0.9), 8, 0.55, 0, 0);
+}
+
+.automation-info-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-border-color: transparent;
+}
+
+.automation-info-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.automation-info-scroll .scroll-bar:horizontal {
+    -fx-opacity: 0;
+    -fx-max-height: 0;
+    -fx-pref-height: 0;
+}
+
+.automation-info-scroll .scroll-bar:vertical {
+    -fx-background-color: transparent;
+    -fx-padding: 2 2 2 2;
+}
+
+.automation-info-scroll .scroll-bar:vertical .thumb {
+    -fx-background-color: rgba(74, 45, 18, 0.45);
+    -fx-background-radius: 10px;
+}
+
+.automation-info-scroll .scroll-bar:vertical .track {
+    -fx-background-color: rgba(255, 255, 255, 0.12);
+    -fx-background-radius: 10px;
+}
+
+.automation-info-box {
+    -fx-padding: 10 12 10 12;
+}
+
+.automation-info-text {
+    -fx-text-fill: #3b2108;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-font-family: "Press Start 2P", "Minecraft", "Pixelify Sans", "Courier New";
+}
+
 .plugin-file-label {
     -fx-text-fill: #f7e8bf;
     -fx-font-size: 16px;
