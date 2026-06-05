@@ -4226,6 +4226,10 @@ public class GameRevisionView implements GameViewCallback {
     private void performEndTurn() {
         stopTimer();
         stopAutoRollCountdown();
+        // Stop dice animation so the engine isn't left mid-roll
+        if (diceTimeline != null && diceTimeline.getStatus() == Animation.Status.RUNNING) {
+            diceTimeline.stop();
+        }
         exitBuildMode();
         clearDiceDisplay();
         diceRolled = false;
@@ -4234,8 +4238,30 @@ public class GameRevisionView implements GameViewCallback {
         if (useCardOverlayManager != null) {
             useCardOverlayManager.hideUseCardPopup();
         }
-        advanceToNextPlayer();
-        startTurnTimer(DEFAULT_TURN_SECONDS);
+
+        if (gameController != null) {
+            try {
+                TurnPhase phase = gameController.getCurrentPhase();
+                if (phase == TurnPhase.ROLL_DICE) {
+                    // Auto-roll to move the engine past ROLL_DICE into TRADE_BUILD
+                    gameController.rollDice();
+                    phase = gameController.getCurrentPhase();
+                }
+                if (phase == TurnPhase.TRADE_BUILD) {
+                    // Engine fires onTurnChanged + onPhaseChanged(ROLL_DICE) via Platform.runLater,
+                    // which restarts the timer and advances the UI to the next player automatically.
+                    gameController.endTurn();
+                }
+                // For SETUP or ROBBER phases the normal flow continues; no forced end.
+            } catch (Exception e) {
+                appendLog("⚠ Auto end turn gagal: " + e.getMessage());
+                advanceToNextPlayer();
+                startTurnTimer(DEFAULT_TURN_SECONDS);
+            }
+        } else {
+            advanceToNextPlayer();
+            startTurnTimer(DEFAULT_TURN_SECONDS);
+        }
     }
 
     private void advanceToNextPlayer() {
