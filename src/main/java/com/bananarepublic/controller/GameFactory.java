@@ -87,6 +87,20 @@ public final class GameFactory {
                     } catch (IllegalArgumentException ignored) {}
                 });
             }
+            // Restore experiment cards to engine inventory so Use Card popup works
+            for (int k = 0; k < pd.knightCardsInHand; k++) {
+                player.getInventory().addCard(CardFactory.createKnight());
+            }
+            for (int k = 0; k < pd.progressCardsInHand; k++) {
+                // Save format combines RoadBuilding+Monopoly; restore all as RoadBuilding
+                player.getInventory().addCard(CardFactory.createRoadBuilding());
+            }
+            for (int k = 0; k < pd.victoryPointCardsInHand; k++) {
+                player.getInventory().addCard(CardFactory.createVictoryPoint());
+            }
+            for (int k = 0; k < pd.knightCardsPlayed; k++) {
+                player.getInventory().incrementKnightCardsPlayed();
+            }
             players.add(player);
         }
 
