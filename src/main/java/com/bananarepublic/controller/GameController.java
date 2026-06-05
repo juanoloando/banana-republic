@@ -118,6 +118,11 @@ public class GameController extends GameEngineAdapter {
         engine.injectCardPlugin(jarFile);
     }
 
+    /** Hitung panjang jalan terpanjang (longest pipe chain) milik player. */
+    public int computeLongestRoad(Player player) {
+        return engine.computeLongestRoad(player);
+    }
+
     /** Hitung VP player dari buildings + VP cards + special cards. */
     public int computeVictoryPoints(Player player) {
         return victoryManager.computeVictoryPoints(player, getBoard());

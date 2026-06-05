@@ -114,6 +114,10 @@ public class RoadManager {
         } else if (maxOtherLength > holderLength && challenger != null) {
             state.setLongestRoadLength(maxOtherLength);
             state.grantSpecialCard(SpecialCard.LONGEST_ROAD, challenger);
+        } else if (maxOtherLength == holderLength && maxOtherLength >= MINIMUM_ROAD_LENGTH) {
+            // Tie after road break — per spec, card is revoked (nobody holds it)
+            state.setLongestRoadLength(holderLength);
+            state.revokeSpecialCard(SpecialCard.LONGEST_ROAD);
         } else {
             state.setLongestRoadLength(holderLength);
         }

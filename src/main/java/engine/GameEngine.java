@@ -155,6 +155,9 @@ public class GameEngine {
         lastPlacedSettlementId = intersectionId;
         notifyListeners(l -> l.onBuildingPlaced(player, intersectionId, "Settlement"));
 
+        if (!isSetup) {
+            roadManager.checkRoadBreak(state);
+        }
         checkVictoryCondition();
     }
 
@@ -310,6 +313,7 @@ public class GameEngine {
             roadManager.updateLargestArmy(state, player);
             notifyListeners(l -> l.onKnightPlayed(player));
             state.setCurrentPhase(TurnPhase.ROBBER_MOVE);
+            notifyListeners(l -> l.onPhaseChanged(state.getCurrentPhase()));
         } else if (card instanceof RoadBuildingCard) {
             freeRoadsRemaining = 2;
             notifyListeners(l -> l.onCardPlayed(player, card));
@@ -420,6 +424,10 @@ public class GameEngine {
 
     public int getFreeRoadsRemaining() {
         return freeRoadsRemaining;
+    }
+
+    public int computeLongestRoad(Player player) {
+        return roadManager.computeLongestRoad(state.getBoard(), player);
     }
 
     public boolean isCardPlayedThisTurn() {

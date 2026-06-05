@@ -5141,7 +5141,11 @@ public class GameRevisionView implements GameViewCallback {
                 stopAutoRollCountdown(); // dice sudah dilempar, batalkan auto-roll
                 exitRobberMoveMode();
                 tryAutoEnterBuildMode();
-                // Timer TIDAK di-restart di sini — sudah berjalan sejak ROLL_DICE
+                // Timer sudah berjalan sejak ROLL_DICE untuk kasus normal.
+                // Jika dice=7, timer dihentikan di ROBBER_DISCARD — restart di sini.
+                if (timerTimeline == null) {
+                    startTurnTimer(DEFAULT_TURN_SECONDS);
+                }
             }
             case ROBBER_DISCARD -> {
                 stopTimer();
@@ -5224,6 +5228,8 @@ public class GameRevisionView implements GameViewCallback {
         if (gameController != null) {
             syncAllPlayerStocksFromEngine();
             refreshInventoryForPlayerIndex(activePlayerIndex);
+            refreshBankPanel(gameController.getBank());
+            initializeBankTradeDummyData();
         }
         appendLog(player.getName() + " built " + buildingType + ".");
         if (gameController != null && isInitialSetupPhase() && !"lab".equals(type)) {
@@ -5240,6 +5246,8 @@ public class GameRevisionView implements GameViewCallback {
         if (gameController != null) {
             syncAllPlayerStocksFromEngine();
             refreshInventoryForPlayerIndex(activePlayerIndex);
+            refreshBankPanel(gameController.getBank());
+            initializeBankTradeDummyData();
         }
         appendLog("🛣 " + player.getName() + " membangun pipe");
     }
@@ -5560,7 +5568,7 @@ public class GameRevisionView implements GameViewCallback {
             if (p instanceof model.player.HumanPlayer hp) {
                 outposts = model.player.HumanPlayer.MAX_SETTLEMENTS - hp.getSettlementsInSupply();
                 labs     = model.player.HumanPlayer.MAX_LABORATORIES - hp.getLaboratoriesInSupply();
-                pipes    = model.player.HumanPlayer.MAX_PIPES - hp.getPipesInSupply();
+                pipes    = gameController.computeLongestRoad(p);
             }
             int vp     = gameController.computeVictoryPoints(p);
             int knight = countCards(p, model.card.CardCategory.KNIGHT);
