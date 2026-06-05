@@ -238,7 +238,7 @@ public class GameRevisionView implements GameViewCallback {
 
     // ── Auto-roll countdown state ────────────────────────────────────
     private Timeline autoRollTimeline;
-    private static final int AUTO_ROLL_SECONDS = 10; // detik tanpa roll → auto-roll
+    private static final int AUTO_ROLL_SECONDS = 60;
 
     // ── Timer state ──────────────────────────────────────────────────
     private static final int DEFAULT_TURN_SECONDS = 90;
@@ -701,6 +701,13 @@ public class GameRevisionView implements GameViewCallback {
                     }
                 }
                 usedCardTracker.setPlayedKnightCount(i, hp.getInventory().getKnightCardsPlayed());
+                for (model.player.SpecialCard sc : hp.getHeldSpecialCards()) {
+                    if (sc == model.player.SpecialCard.LONGEST_ROAD) {
+                        inventory.setQuantity(CardType.LONGEST_ROAD, 1);
+                    } else if (sc == model.player.SpecialCard.LARGEST_ARMY) {
+                        inventory.setQuantity(CardType.LARGEST_ARMY, 1);
+                    }
+                }
             }
         }
     }
@@ -3412,9 +3419,37 @@ public class GameRevisionView implements GameViewCallback {
     }
 
     private Set<TradeHarborType> getAccessibleHarborsForPlayer(int playerIndex) {
+        if (gameController != null) {
+            Board board = gameController.getBoard();
+            List<Player> players = gameController.getAllPlayers();
+            if (board != null && playerIndex >= 0 && playerIndex < players.size()) {
+                Player player = players.get(playerIndex);
+                Set<Integer> ownedIntersections = new HashSet<>();
+                for (Intersection inter : board.getAllIntersections()) {
+                    inter.getBuilding().ifPresent(building -> {
+                        if (building.getOwnerName().equals(player.getName())) {
+                            ownedIntersections.add(inter.getId());
+                        }
+                    });
+                }
+                Set<TradeHarborType> accessible = new HashSet<>();
+                for (Harbor harbor : board.getAllHarbors()) {
+                    if (ownedIntersections.contains(harbor.getIntersectionIdA())
+                            || ownedIntersections.contains(harbor.getIntersectionIdB())) {
+                        TradeHarborType harborType = parseHarborType(harbor.getType().name());
+                        if (harborType != null) {
+                            accessible.add(harborType);
+                        }
+                    }
+                }
+                return accessible;
+            }
+        }
+
         SaveData saveData = GameSession.getLoadedSaveData();
-        if (saveData == null || saveData.harbors == null || saveData.players == null || playerIndex >= saveData.players.size()) {
-            return new HashSet<>(Set.of(TradeHarborType.GENERAL, TradeHarborType.BANANA, TradeHarborType.WOOD));
+        if (saveData == null || saveData.harbors == null || saveData.players == null
+                || playerIndex >= saveData.players.size()) {
+            return Collections.emptySet();
         }
 
         SaveData.PlayerData playerData = saveData.players.get(playerIndex);
@@ -3436,11 +3471,6 @@ public class GameRevisionView implements GameViewCallback {
                     accessible.add(harborType);
                 }
             }
-        }
-        if (accessible.isEmpty()) {
-            accessible.add(TradeHarborType.GENERAL);
-            accessible.add(TradeHarborType.BANANA);
-            accessible.add(TradeHarborType.WOOD);
         }
         return accessible;
     }
@@ -5154,6 +5184,7 @@ public class GameRevisionView implements GameViewCallback {
             }
             case ROBBER_MOVE -> {
                 stopAutoRollCountdown();
+                exitBuildMode();
                 appendLog("Move Nimon Ungu to another tile.");
                 showCenteredWarning("Click a tile to place Nimon Ungu!", 4000, "#8B4513");
                 enterRobberMoveMode();
