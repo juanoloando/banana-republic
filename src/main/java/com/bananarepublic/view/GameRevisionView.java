@@ -5500,9 +5500,10 @@ public class GameRevisionView implements GameViewCallback {
 
     @Override
     public void onTimerTick(int secondsRemaining) {
-        // Engine timer mengoverride UI timer jika terhubung
-        remainingSeconds = secondsRemaining;
-        updateTimerDisplay();
+        // UI timer (dimulai sejak ROLL_DICE) yang mengelola tampilan.
+        // Engine timer baru mulai setelah TRADE_BUILD (sesudah dice diroll),
+        // sehingga nilainya lebih besar dan akan menyebabkan timer "reset" jika dipakai.
+        // Abaikan — engine tetap menangani onTimerExpired saat waktu habis.
     }
 
     @Override
@@ -6031,7 +6032,8 @@ public class GameRevisionView implements GameViewCallback {
 
     @FXML
     private void onSaveClicked() {
-        showSavePluginDialog();
+        // Langsung buka file explorer tanpa popup perantara
+        performSaveGame();
     }
 
     private void showSavePluginDialog() {
