@@ -26,6 +26,25 @@
                                     </image>
                                 </ImageView>
 
+                                <Pane fx:id="fireworksLayer" mouseTransparent="true" pickOnBounds="false"
+                                      prefHeight="1124.0" prefWidth="1998.0"/>
+
+                                <ImageView fx:id="minionDanceImageView" fitHeight="240.0" fitWidth="240.0"
+                                           layoutX="1393.0" layoutY="752.0" mouseTransparent="true"
+                                           preserveRatio="true" smooth="true">
+                                    <image>
+                                        <Image url="@../images/declare_victory/minion_dance.png"/>
+                                    </image>
+                                </ImageView>
+
+                                <ImageView fx:id="minionGuitarImageView" fitHeight="240.0" fitWidth="240.0"
+                                           layoutX="163.0" layoutY="559.0" mouseTransparent="true"
+                                           preserveRatio="true" smooth="true">
+                                    <image>
+                                        <Image url="@../images/declare_victory/minion_guitar.png"/>
+                                    </image>
+                                </ImageView>
+
                                 <ImageView fitHeight="216.0" fitWidth="835.0" layoutX="574.0" layoutY="32.0" mouseTransparent="true"
                                            preserveRatio="false" smooth="true">
                                     <image>
