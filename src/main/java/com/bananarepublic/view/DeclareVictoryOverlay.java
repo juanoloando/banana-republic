@@ -17,16 +17,19 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.media.AudioClip;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.stage.FileChooser;
+import javafx.stage.Window;
 import javafx.util.Duration;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
-import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class DeclareVictoryOverlay {
@@ -78,7 +81,7 @@ public class DeclareVictoryOverlay {
     private Supplier<List<VictoryLeaderboardEntry>> leaderboardSupplier = ArrayList::new;
     private Consumer<String> informationCallback = msg -> {};
     private Runnable mainMenuAction = () -> {};
-    private BooleanSupplier saveAction = () -> true;
+    private Function<File, Boolean> saveAction = file -> false;
 
     private static class NodeAnimationBundle {
         final Circle circle;
@@ -131,7 +134,7 @@ public class DeclareVictoryOverlay {
                           Supplier<List<VictoryLeaderboardEntry>> leaderboardSupplier,
                           Consumer<String> informationCallback,
                           Runnable mainMenuAction,
-                          BooleanSupplier saveAction) {
+                          Function<File, Boolean> saveAction) {
         if (currentPlayerIndexSupplier != null) this.currentPlayerIndexSupplier = currentPlayerIndexSupplier;
         if (leaderboardSupplier != null) this.leaderboardSupplier = leaderboardSupplier;
         if (informationCallback != null) this.informationCallback = informationCallback;
@@ -245,17 +248,49 @@ public class DeclareVictoryOverlay {
     @FXML
     private void onVictorySaveClicked() {
         System.out.println("Victory save clicked");
+
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save Game");
+        fileChooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("Banana Republic Save (*.json)", "*.json")
+        );
+        fileChooser.setInitialFileName("banana_republic_save.json");
+
+        Window owner = overlayRoot != null && overlayRoot.getScene() != null
+                ? overlayRoot.getScene().getWindow()
+                : null;
+        File selectedFile = fileChooser.showSaveDialog(owner);
+        if (selectedFile == null) {
+            System.out.println("Save dialog cancelled");
+            return;
+        }
+
+        selectedFile = ensureJsonExtension(selectedFile);
+        System.out.println("Saving game to: " + selectedFile.getAbsolutePath());
+
         boolean success;
         try {
-            success = saveAction.getAsBoolean();
+            success = Boolean.TRUE.equals(saveAction.apply(selectedFile));
         } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("Victory save failed: " + e.getMessage());
             success = false;
         }
         if (success) {
+            System.out.println("Victory save successful");
             informationCallback.accept("Game saved successfully.");
         } else {
+            System.out.println("Victory save failed: persistence service returned false");
             informationCallback.accept("Failed to save game.");
         }
+    }
+
+    private File ensureJsonExtension(File selectedFile) {
+        if (selectedFile.getName().toLowerCase().endsWith(".json")) {
+            return selectedFile;
+        }
+        File absoluteFile = selectedFile.getAbsoluteFile();
+        return new File(absoluteFile.getParentFile(), absoluteFile.getName() + ".json");
     }
 
     private void normalizePopupScale() {

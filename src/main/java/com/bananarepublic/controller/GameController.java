@@ -132,6 +132,10 @@ public class GameController extends GameEngineAdapter {
         return victoryManager.getVictoryThreshold();
     }
 
+    public void confirmVictory(Player winner) {
+        engine.confirmVictory(winner);
+    }
+
     // ── Validation helpers — pakai BuildValidator ─────────────────────
 
     /**
