@@ -1,18 +1,21 @@
 package com.bananarepublic.controller;
 
 import engine.*;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
+import javafx.util.Duration;
 import model.board.Board;
 import model.board.BoardPath;
 import model.board.HexCoordinate;
 import model.board.Intersection;
-import model.building.Laboratory;
-import model.building.Settlement;
+import model.board.TerrainType;
+import model.building.BuildCost;
 import model.card.ExperimentCard;
 import model.exception.InvalidBuildException;
 import model.player.Player;
 import model.resource.Bank;
 import model.resource.ResourceType;
+import plugin.BotPlayer;
 
 import java.util.*;
 
@@ -38,6 +41,8 @@ public class GameController extends GameEngineAdapter {
 
     public void setUiCallback(GameViewCallback callback) {
         this.uiCallback = callback;
+        // If the first active player is a bot, kick off its action after the UI is ready.
+        Platform.runLater(() -> scheduleBotActionIfNeeded(engine.getState().getCurrentPhase()));
     }
 
     // ── Action delegates (dipanggil UI) ──────────────────────────────
@@ -201,7 +206,37 @@ public class GameController extends GameEngineAdapter {
 
     @Override
     public void onPhaseChanged(TurnPhase newPhase) {
-        Platform.runLater(() -> { if (uiCallback != null) uiCallback.onPhaseChanged(newPhase); });
+        Platform.runLater(() -> {
+            // Auto-discard bots BEFORE the UI queries getPlayersRequiredToDiscard().
+            if (newPhase == TurnPhase.ROBBER_DISCARD) {
+                autoBotDiscardAll();
+            }
+            // If autoBotDiscardAll advanced the phase (all humans done too) skip the stale callback.
+            TurnPhase currentPhase = engine.getState().getCurrentPhase();
+            if (currentPhase == newPhase) {
+                // Bots drive interactive placement phases automatically.
+                // Skip forwarding those phases to the UI so the tile-pick overlay,
+                // robber move circles, and settlement-select mode never appear for bots.
+                boolean activeIsBot = engine.getState().getActivePlayer() instanceof BotPlayer;
+                boolean skipInteractiveUi = activeIsBot && isInteractivePlacementPhase(newPhase);
+                if (uiCallback != null && !skipInteractiveUi) {
+                    uiCallback.onPhaseChanged(newPhase);
+                }
+                scheduleBotActionIfNeeded(currentPhase);
+            }
+            // When the phase changed inside autoBotDiscardAll the new phase's own
+            // Platform.runLater (queued by notifyListeners) handles UI + bot scheduling.
+        });
+    }
+
+    /**
+     * Returns true for phases that put the UI into an interactive "click to place" mode.
+     * These are driven automatically for bots, so the UI should not enter those modes.
+     */
+    private static boolean isInteractivePlacementPhase(TurnPhase phase) {
+        return phase == TurnPhase.ROBBER_MOVE
+            || phase == TurnPhase.SETUP_PLACE_FIRST
+            || phase == TurnPhase.SETUP_PLACE_SECOND;
     }
 
     @Override
@@ -280,5 +315,191 @@ public class GameController extends GameEngineAdapter {
     @Override
     public void onGameWon(Player winner) {
         Platform.runLater(() -> { if (uiCallback != null) uiCallback.onGameWon(winner); });
+    }
+
+    // ── Bot automation ────────────────────────────────────────────────
+
+    private static final double BOT_ACTION_DELAY_SEC = 1.2;
+
+    /** Schedule the active bot's action for the given phase after a short visual delay. */
+    private void scheduleBotActionIfNeeded(TurnPhase phase) {
+        if (engine.getState().isGameOver()) return;
+        Player active = engine.getState().getActivePlayer();
+        if (!(active instanceof BotPlayer)) return;
+        BotPlayer bot = (BotPlayer) active;
+        PauseTransition delay = new PauseTransition(Duration.seconds(BOT_ACTION_DELAY_SEC));
+        delay.setOnFinished(e -> executeBotPhaseAction(bot, phase));
+        delay.play();
+    }
+
+    /** Dispatch the correct action for the given phase; guards stale callbacks. */
+    private void executeBotPhaseAction(BotPlayer bot, TurnPhase phase) {
+        if (engine.getState().isGameOver()) return;
+        if (!engine.getState().getActivePlayer().equals(bot)) return;
+        if (engine.getState().getCurrentPhase() != phase) return;
+        try {
+            switch (phase) {
+                case SETUP_PLACE_FIRST:
+                case SETUP_PLACE_SECOND:
+                    executeBotSetup(bot);
+                    break;
+                case ROLL_DICE:
+                    engine.rollDice();
+                    break;
+                case ROBBER_MOVE:
+                    executeBotRobberMove(bot);
+                    break;
+                case TRADE_BUILD:
+                    executeBotTradeBuild(bot);
+                    break;
+                default:
+                    break;
+            }
+        } catch (Exception e) {
+            System.err.println("[BOT] " + bot.getName() + " error in " + phase + ": " + e.getMessage());
+        }
+    }
+
+    /** Place a random valid settlement then a random adjacent pipe during setup. */
+    private void executeBotSetup(BotPlayer bot) {
+        Set<Integer> validSettlements = getValidSettlementIds(bot);
+        if (validSettlements.isEmpty()) return;
+        List<Integer> settlementList = new ArrayList<>(validSettlements);
+        int intersectionId = settlementList.get((int)(Math.random() * settlementList.size()));
+        engine.buildSettlement(intersectionId);
+
+        Set<Integer> validPipes = getValidPipeIds(bot, intersectionId);
+        if (validPipes.isEmpty()) return;
+        List<Integer> pipeList = new ArrayList<>(validPipes);
+        int pipeId = pipeList.get((int)(Math.random() * pipeList.size()));
+        engine.buildPipeSetup(pipeId, intersectionId);
+    }
+
+    /** Move robber to a non-desert tile, then steal from the richest adjacent player. */
+    private void executeBotRobberMove(BotPlayer bot) {
+        HexCoordinate current = engine.getState().getRobberPosition();
+        HexCoordinate target = engine.getState().getBoard().getAllTiles().stream()
+                .filter(t -> !t.getCoordinate().equals(current)
+                          && t.getTerrainType() != TerrainType.DESERT)
+                .map(t -> t.getCoordinate())
+                .findFirst()
+                .orElseGet(() -> engine.getState().getBoard().getAllTiles().stream()
+                        .filter(t -> !t.getCoordinate().equals(current))
+                        .map(t -> t.getCoordinate())
+                        .findFirst()
+                        .orElse(current));
+        engine.moveRobber(target);
+
+        List<Player> candidates = engine.getStealCandidates();
+        if (!candidates.isEmpty()) {
+            Player richest = candidates.stream()
+                    .max(Comparator.comparingInt(Player::getTotalResourceCount))
+                    .orElse(candidates.get(0));
+            engine.stealFromPlayer(richest);
+        }
+    }
+
+    /** Run the bot's resource strategy, then spend resources on builds, then end the turn. */
+    private void executeBotTradeBuild(BotPlayer bot) {
+        engine.stopTradeBuildTimer();
+
+        // 1. Strategy: gather resources via bank trades (does NOT auto-play/buy any cards).
+        try {
+            bot.executeTurn(engine.getState(), engine);
+        } catch (Exception e) {
+            System.err.println("[BOT] " + bot.getName() + " strategy error: " + e.getMessage());
+        }
+
+        // 2. Spend gathered resources on actual builds (lab > settlement > pipe).
+        //    Cards are intentionally excluded — bots do NOT auto-play experiment cards.
+        if (engine.getState().getCurrentPhase() == TurnPhase.TRADE_BUILD
+                && !engine.getState().isGameOver()) {
+            tryBotBuildActions(bot);
+        }
+
+        // 3. End turn.
+        if (engine.getState().getCurrentPhase() == TurnPhase.TRADE_BUILD
+                && !engine.getState().isGameOver()) {
+            engine.endTurn();
+        }
+    }
+
+    /**
+     * Attempt builds in priority order: lab upgrade → new settlement → pipe.
+     * Loops until nothing affordable/valid remains, so one TRADE_BUILD phase can place
+     * multiple structures when the bot has sufficient resources.
+     * Experiment-card purchasing is intentionally omitted to prevent auto-use of cards.
+     */
+    private void tryBotBuildActions(BotPlayer bot) {
+        int guard = 20;
+        while (guard-- > 0
+               && engine.getState().getCurrentPhase() == TurnPhase.TRADE_BUILD
+               && !engine.getState().isGameOver()) {
+            if (tryBotUpgradeLab(bot))   continue;
+            if (tryBotBuildSettlement(bot)) continue;
+            if (tryBotBuildPipe(bot))    continue;
+            break;
+        }
+    }
+
+    private boolean tryBotUpgradeLab(BotPlayer bot) {
+        if (!bot.canAfford(BuildCost.LABORATORY.getAllCosts())) return false;
+        Set<Integer> ids = getValidLabIds(bot);
+        if (ids.isEmpty()) return false;
+        try { engine.upgradeLaboratory(ids.iterator().next()); return true; }
+        catch (Exception e) { return false; }
+    }
+
+    private boolean tryBotBuildSettlement(BotPlayer bot) {
+        if (!bot.canAfford(BuildCost.SETTLEMENT.getAllCosts())) return false;
+        Set<Integer> ids = getValidSettlementIds(bot);
+        if (ids.isEmpty()) return false;
+        List<Integer> list = new ArrayList<>(ids);
+        try {
+            engine.buildSettlement(list.get((int)(Math.random() * list.size())));
+            return true;
+        } catch (Exception e) { return false; }
+    }
+
+    private boolean tryBotBuildPipe(BotPlayer bot) {
+        if (!bot.canAfford(BuildCost.PIPE.getAllCosts())) return false;
+        Set<Integer> ids = getValidPipeIds(bot);
+        if (ids.isEmpty()) return false;
+        try { engine.buildPipe(ids.iterator().next()); return true; }
+        catch (Exception e) { return false; }
+    }
+
+    /** Auto-discard excess resources for every bot that must discard due to a 7 roll. */
+    private void autoBotDiscardAll() {
+        List<Player> toDiscard = new ArrayList<>(engine.getPlayersRequiredToDiscard());
+        for (Player player : toDiscard) {
+            if (!(player instanceof BotPlayer)) continue;
+            BotPlayer bot = (BotPlayer) player;
+            int count = engine.computeDiscardCount(bot);
+            if (count <= 0) continue;
+            try {
+                engine.discardResources(bot, makeBotDiscardMap(bot, count));
+            } catch (Exception e) {
+                System.err.println("[BOT] " + bot.getName() + " discard error: " + e.getMessage());
+            }
+        }
+    }
+
+    /** Build a discard map: drop the most-abundant resources first. */
+    private Map<ResourceType, Integer> makeBotDiscardMap(BotPlayer bot, int count) {
+        Map<ResourceType, Integer> map = new EnumMap<>(ResourceType.class);
+        int remaining = count;
+        List<ResourceType> sorted = new ArrayList<>(Arrays.asList(ResourceType.values()));
+        sorted.sort((a, b) -> bot.getResourceCount(b) - bot.getResourceCount(a));
+        for (ResourceType type : sorted) {
+            if (remaining <= 0) break;
+            int have    = bot.getResourceCount(type);
+            int discard = Math.min(have, remaining);
+            if (discard > 0) {
+                map.put(type, discard);
+                remaining -= discard;
+            }
+        }
+        return map;
     }
 }

@@ -14,6 +14,8 @@ import model.player.Player;
 import model.player.PlayerColor;
 import model.resource.ResourceBank;
 import persistence.SaveData;
+import plugin.BotPlayer;
+import plugin.BotPluginLoader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,8 +38,26 @@ public final class GameFactory {
         // ── Players ───────────────────────────────────────────────────
         PlayerColor[] colors = { PlayerColor.YELLOW, PlayerColor.BLUE, PlayerColor.RED, PlayerColor.GREEN };
         List<Player> players = new ArrayList<>();
+        java.util.Map<Integer, String> botPaths = GameSession.getPlayerBotPluginPaths();
         for (int i = 0; i < names.size(); i++) {
-            players.add(new HumanPlayer(names.get(i), colors[i % colors.length]));
+            String name  = names.get(i);
+            PlayerColor color = colors[i % colors.length];
+            String botPath = botPaths.get(i);
+            if (botPath != null && !botPath.isBlank()) {
+                try {
+                    BotPluginLoader loader = new BotPluginLoader();
+                    plugin.PlayerStrategy strategy = loader.loadAllStrategies(new java.io.File(botPath)).get(0);
+                    players.add(new BotPlayer(name, color, strategy));
+                    System.out.println("[GameFactory] Bot player created: " + name
+                            + " (" + strategy.getStrategyName() + ")");
+                } catch (Exception e) {
+                    System.err.println("[GameFactory] Failed to load bot for " + name
+                            + ", falling back to human: " + e.getMessage());
+                    players.add(new HumanPlayer(name, color));
+                }
+            } else {
+                players.add(new HumanPlayer(name, color));
+            }
         }
 
         // ── Board ─────────────────────────────────────────────────────
