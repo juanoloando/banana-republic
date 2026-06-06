@@ -210,6 +210,11 @@ public class GameController extends GameEngineAdapter {
             // Auto-discard bots BEFORE the UI queries getPlayersRequiredToDiscard().
             if (newPhase == TurnPhase.ROBBER_DISCARD) {
                 autoBotDiscardAll();
+                // If nobody (bot or human) needs to discard, advance phase now so
+                // ROBBER_MOVE handler applies bot-vs-human routing correctly.
+                if (engine.getPlayersRequiredToDiscard().isEmpty()) {
+                    engine.skipDiscardPhase();
+                }
             }
             // If autoBotDiscardAll advanced the phase (all humans done too) skip the stale callback.
             TurnPhase currentPhase = engine.getState().getCurrentPhase();
@@ -270,7 +275,10 @@ public class GameController extends GameEngineAdapter {
 
     @Override
     public void onRobberMoved(HexCoordinate newPosition) {
-        Platform.runLater(() -> { if (uiCallback != null) uiCallback.onRobberMoved(newPosition); });
+        Platform.runLater(() -> {
+            boolean activeIsBot = engine.getState().getActivePlayer() instanceof BotPlayer;
+            if (uiCallback != null && !activeIsBot) uiCallback.onRobberMoved(newPosition);
+        });
     }
 
     @Override

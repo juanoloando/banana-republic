@@ -530,7 +530,7 @@ public class JsonSaveLoadService implements SaveLoadService {
         SaveData.PlayerData pd = new SaveData.PlayerData();
         try { pd.name = parseInlineString(obj, "name"); } catch (Exception e) { pd.name = "Unknown"; }
         try { pd.color = parseInlineString(obj, "color"); } catch (Exception e) { pd.color = "RED"; }
-        try { pd.isBot = obj.contains("\"isBot\":true"); } catch (Exception ignored) {}
+        try { pd.isBot = obj.contains("\"isBot\":true") || obj.contains("\"isBot\": true"); } catch (Exception ignored) {}
         try { pd.botStrategyName = parseInlineStringNullable(obj, "botStrategyName"); } catch (Exception ignored) {}
         try { pd.knightCardsInHand = parseInlineInt(obj, "knightCardsInHand"); } catch (Exception ignored) {}
         try { pd.progressCardsInHand = parseInlineInt(obj, "progressCardsInHand"); } catch (Exception ignored) {}

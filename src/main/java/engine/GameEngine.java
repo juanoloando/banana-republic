@@ -369,6 +369,14 @@ public class GameEngine {
         }
     }
 
+    /** Advance from ROBBER_DISCARD to ROBBER_MOVE when nobody needs to discard. */
+    public void skipDiscardPhase() {
+        if (state.getCurrentPhase() != TurnPhase.ROBBER_DISCARD) return;
+        if (!getPlayersRequiredToDiscard().isEmpty()) return;
+        state.setCurrentPhase(TurnPhase.ROBBER_MOVE);
+        notifyListeners(l -> l.onPhaseChanged(TurnPhase.ROBBER_MOVE));
+    }
+
     public Optional<ResourceType> stealFromPlayer(Player targetPlayer) {
         assert targetPlayer != null : "Target player must not be null";
 

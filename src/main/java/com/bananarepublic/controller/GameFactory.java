@@ -99,30 +99,47 @@ public final class GameFactory {
             PlayerColor savedColor = (pd.color != null)
                 ? PlayerColor.valueOf(pd.color.toUpperCase())
                 : colors[i % colors.length];
-            HumanPlayer player = new HumanPlayer(pd.name, savedColor);
+
+            Player player;
+            if (pd.isBot && pd.botStrategyName != null && !pd.botStrategyName.isBlank()) {
+                plugin.PlayerStrategy strategy = findBotStrategyByName(pd.botStrategyName);
+                if (strategy != null) {
+                    player = new BotPlayer(pd.name, savedColor, strategy);
+                    System.out.println("[GameFactory] Restored bot player: " + pd.name
+                            + " (" + strategy.getStrategyName() + ")");
+                } else {
+                    System.err.println("[GameFactory] Bot strategy '" + pd.botStrategyName
+                            + "' not found, falling back to human for: " + pd.name);
+                    player = new HumanPlayer(pd.name, savedColor);
+                }
+            } else {
+                player = new HumanPlayer(pd.name, savedColor);
+            }
+            // Both HumanPlayer and BotPlayer (which extends HumanPlayer) have getInventory()
+            HumanPlayer hp = (HumanPlayer) player;
             // Restore resources
             if (pd.resources != null) {
                 pd.resources.forEach((key, val) -> {
                     try {
                         model.resource.ResourceType type =
                             model.resource.ResourceType.valueOf(key.toUpperCase());
-                        if (val > 0) player.getInventory().addResource(type, val);
+                        if (val > 0) hp.getInventory().addResource(type, val);
                     } catch (IllegalArgumentException ignored) {}
                 });
             }
             // Restore experiment cards to engine inventory so Use Card popup works
             for (int k = 0; k < pd.knightCardsInHand; k++) {
-                player.getInventory().addCard(CardFactory.createKnight());
+                hp.getInventory().addCard(CardFactory.createKnight());
             }
             for (int k = 0; k < pd.progressCardsInHand; k++) {
                 // Save format combines RoadBuilding+Monopoly; restore all as RoadBuilding
-                player.getInventory().addCard(CardFactory.createRoadBuilding());
+                hp.getInventory().addCard(CardFactory.createRoadBuilding());
             }
             for (int k = 0; k < pd.victoryPointCardsInHand; k++) {
-                player.getInventory().addCard(CardFactory.createVictoryPoint());
+                hp.getInventory().addCard(CardFactory.createVictoryPoint());
             }
             for (int k = 0; k < pd.knightCardsPlayed; k++) {
-                player.getInventory().incrementKnightCardsPlayed();
+                hp.getInventory().incrementKnightCardsPlayed();
             }
             players.add(player);
         }
@@ -236,5 +253,33 @@ public final class GameFactory {
         engine.addListener(controller);
 
         return controller;
+    }
+
+    /**
+     * Scans known bot-JAR directories for a strategy whose name matches strategyName.
+     * Returns the first match found, or null if none.
+     */
+    private static plugin.PlayerStrategy findBotStrategyByName(String strategyName) {
+        String[] searchDirs = {
+            "test-jar/test-bot",
+            System.getProperty("user.dir") + "/test-jar/test-bot",
+            System.getProperty("user.dir") + "/plugin-test"
+        };
+        BotPluginLoader loader = new BotPluginLoader();
+        for (String dir : searchDirs) {
+            java.io.File botDir = new java.io.File(dir);
+            if (!botDir.exists() || !botDir.isDirectory()) continue;
+            java.io.File[] jars = botDir.listFiles(f -> f.getName().endsWith(".jar"));
+            if (jars == null) continue;
+            for (java.io.File jar : jars) {
+                try {
+                    List<plugin.PlayerStrategy> strategies = loader.loadAllStrategies(jar);
+                    for (plugin.PlayerStrategy s : strategies) {
+                        if (strategyName.equals(s.getStrategyName())) return s;
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+        return null;
     }
 }
