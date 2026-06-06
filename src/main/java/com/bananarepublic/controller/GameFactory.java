@@ -14,6 +14,8 @@ import model.player.Player;
 import model.player.PlayerColor;
 import model.resource.ResourceBank;
 import persistence.SaveData;
+import plugin.BotPlayer;
+import plugin.BotPluginLoader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,10 +36,28 @@ public final class GameFactory {
         List<String> names = GameSession.getPlayerNames();
 
         // ── Players ───────────────────────────────────────────────────
-        PlayerColor[] colors = PlayerColor.values(); // RED, BLUE, GREEN, YELLOW
+        PlayerColor[] colors = { PlayerColor.YELLOW, PlayerColor.BLUE, PlayerColor.RED, PlayerColor.GREEN };
         List<Player> players = new ArrayList<>();
+        java.util.Map<Integer, String> botPaths = GameSession.getPlayerBotPluginPaths();
         for (int i = 0; i < names.size(); i++) {
-            players.add(new HumanPlayer(names.get(i), colors[i % colors.length]));
+            String name  = names.get(i);
+            PlayerColor color = colors[i % colors.length];
+            String botPath = botPaths.get(i);
+            if (botPath != null && !botPath.isBlank()) {
+                try {
+                    BotPluginLoader loader = new BotPluginLoader();
+                    plugin.PlayerStrategy strategy = loader.loadAllStrategies(new java.io.File(botPath)).get(0);
+                    players.add(new BotPlayer(name, color, strategy));
+                    System.out.println("[GameFactory] Bot player created: " + name
+                            + " (" + strategy.getStrategyName() + ")");
+                } catch (Exception e) {
+                    System.err.println("[GameFactory] Failed to load bot for " + name
+                            + ", falling back to human: " + e.getMessage());
+                    players.add(new HumanPlayer(name, color));
+                }
+            } else {
+                players.add(new HumanPlayer(name, color));
+            }
         }
 
         // ── Board ─────────────────────────────────────────────────────
@@ -72,11 +92,14 @@ public final class GameFactory {
      */
     public static GameController buildFromSave(SaveData saveData) {
         // ── Players dari save ─────────────────────────────────────────
-        PlayerColor[] colors = PlayerColor.values();
+        PlayerColor[] colors = { PlayerColor.YELLOW, PlayerColor.BLUE, PlayerColor.RED, PlayerColor.GREEN };
         List<Player> players = new ArrayList<>();
         for (int i = 0; i < saveData.players.size(); i++) {
             SaveData.PlayerData pd = saveData.players.get(i);
-            HumanPlayer player = new HumanPlayer(pd.name, colors[i % colors.length]);
+            PlayerColor savedColor = (pd.color != null)
+                ? PlayerColor.valueOf(pd.color.toUpperCase())
+                : colors[i % colors.length];
+            HumanPlayer player = new HumanPlayer(pd.name, savedColor);
             // Restore resources
             if (pd.resources != null) {
                 pd.resources.forEach((key, val) -> {
@@ -86,6 +109,20 @@ public final class GameFactory {
                         if (val > 0) player.getInventory().addResource(type, val);
                     } catch (IllegalArgumentException ignored) {}
                 });
+            }
+            // Restore experiment cards to engine inventory so Use Card popup works
+            for (int k = 0; k < pd.knightCardsInHand; k++) {
+                player.getInventory().addCard(CardFactory.createKnight());
+            }
+            for (int k = 0; k < pd.progressCardsInHand; k++) {
+                // Save format combines RoadBuilding+Monopoly; restore all as RoadBuilding
+                player.getInventory().addCard(CardFactory.createRoadBuilding());
+            }
+            for (int k = 0; k < pd.victoryPointCardsInHand; k++) {
+                player.getInventory().addCard(CardFactory.createVictoryPoint());
+            }
+            for (int k = 0; k < pd.knightCardsPlayed; k++) {
+                player.getInventory().incrementKnightCardsPlayed();
             }
             players.add(player);
         }
@@ -177,6 +214,22 @@ public final class GameFactory {
                 && saveData.currentPlayerIndex < players.size()) {
             state.setCurrentPlayerIndex(saveData.currentPlayerIndex);
         }
+
+        // Restore special card holders and lengths
+        if (saveData.longestRoadHolder != null) {
+            players.stream()
+                .filter(p -> p.getName().equals(saveData.longestRoadHolder))
+                .findFirst()
+                .ifPresent(p -> state.grantSpecialCard(model.player.SpecialCard.LONGEST_ROAD, p));
+        }
+        if (saveData.largestArmyHolder != null) {
+            players.stream()
+                .filter(p -> p.getName().equals(saveData.largestArmyHolder))
+                .findFirst()
+                .ifPresent(p -> state.grantSpecialCard(model.player.SpecialCard.LARGEST_ARMY, p));
+        }
+        if (saveData.currentLongestRoadLength > 0) state.setLongestRoadLength(saveData.currentLongestRoadLength);
+        if (saveData.currentLargestArmySize > 0) state.setLargestArmySize(saveData.currentLargestArmySize);
 
         GameEngine engine = new GameEngine(state);
         GameController controller = new GameController(engine);

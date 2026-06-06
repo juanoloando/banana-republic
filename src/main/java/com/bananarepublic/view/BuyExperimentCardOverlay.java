@@ -13,9 +13,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import model.resource.ResourceType;
 
-import java.util.List;
-import java.util.Random;
-import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -47,11 +44,9 @@ public class BuyExperimentCardOverlay {
 
     private Supplier<Boolean> phaseAllowedSupplier = () -> true;
     private Function<ResourceType, Integer> playerResourceSupplier = resourceType -> 0;
-    private BooleanSupplier purchaseCostApplier = () -> false;
+    private Supplier<model.card.ExperimentCard> purchaseCostApplier = () -> null;
     private Consumer<String> informationCallback = msg -> {};
     private Consumer<String> logCallback = msg -> {};
-    private final Random random = new Random();
-    private int experimentDeckSize = 10; // TODO: replace with real Experiment deck size from engine.
 
     @FXML
     public void initialize() {
@@ -82,7 +77,7 @@ public class BuyExperimentCardOverlay {
 
     public void configure(Supplier<Boolean> phaseAllowedSupplier,
                           Function<ResourceType, Integer> playerResourceSupplier,
-                          BooleanSupplier purchaseCostApplier,
+                          Supplier<model.card.ExperimentCard> purchaseCostApplier,
                           Consumer<String> informationCallback,
                           Consumer<String> logCallback) {
         if (phaseAllowedSupplier != null) this.phaseAllowedSupplier = phaseAllowedSupplier;
@@ -127,16 +122,15 @@ public class BuyExperimentCardOverlay {
             return;
         }
 
-        boolean applied = purchaseCostApplier.getAsBoolean();
-        if (!applied) {
+        model.card.ExperimentCard boughtCard = purchaseCostApplier.get();
+        if (boughtCard == null) {
             String message = "Not enough resources. You need 1 Ore, 1 Banana, and 1 Wheat.";
             showError(message);
             System.out.println("Experiment Card purchase failed: " + message);
             return;
         }
 
-        experimentDeckSize = Math.max(0, experimentDeckSize - 1);
-        String drawnCard = drawDummyExperimentCard();
+        String drawnCard = boughtCard.getCardName();
         String successMessage = "Experiment Card purchased successfully! You received: " + drawnCard + ".";
         logCallback.accept(successMessage);
         System.out.println("Experiment Card purchase successful");
@@ -148,9 +142,6 @@ public class BuyExperimentCardOverlay {
     private String validatePurchase() {
         if (!phaseAllowedSupplier.get()) {
             return "You can only buy Experiment Card during Trade/Build phase.";
-        }
-        if (experimentDeckSize <= 0) {
-            return "Experiment Card deck is empty.";
         }
 
         int ore = Math.max(0, playerResourceSupplier.apply(ResourceType.ORE));
@@ -164,11 +155,6 @@ public class BuyExperimentCardOverlay {
         if (banana < 1) return "Not enough Banana. You need 1 Banana.";
         if (wheat < 1) return "Not enough Wheat. You need 1 Wheat.";
         return null;
-    }
-
-    private String drawDummyExperimentCard() {
-        List<String> dummyCards = List.of("Guard", "Innovation", "Secret Achievement Point");
-        return dummyCards.get(random.nextInt(dummyCards.size()));
     }
 
     private void renderRequiredResources() {

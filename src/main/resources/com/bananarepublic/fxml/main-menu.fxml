@@ -4,6 +4,7 @@
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
@@ -12,6 +13,46 @@
            fx:controller="com.bananarepublic.view.MainMenuView"
            fx:id="rootPane"
            styleClass="main-menu-root">
+
+    <!-- Animated minion layer - fills entire background -->
+    <Pane fx:id="minionLayer" maxWidth="Infinity" maxHeight="Infinity"
+          mouseTransparent="true" pickOnBounds="false">
+
+        <!-- Bottom-right water minions (duck, float, snorkel) – same size, clustered -->
+        <ImageView fx:id="floatMinionView" fitWidth="115" fitHeight="115"
+                   preserveRatio="true" smooth="true">
+            <image><Image url="@../images/mainmenu/float_minion.png"/></image>
+        </ImageView>
+        <ImageView fx:id="duckMinionView" fitWidth="115" fitHeight="115"
+                   preserveRatio="true" smooth="true">
+            <image><Image url="@../images/mainmenu/duck_minion.png"/></image>
+        </ImageView>
+        <ImageView fx:id="snorkelMinionView" fitWidth="115" fitHeight="115"
+                   preserveRatio="true" smooth="true">
+            <image><Image url="@../images/mainmenu/snorkel_minion.png"/></image>
+        </ImageView>
+
+        <!-- Water minion – bottom-right of BANANA REPUBLIC title -->
+        <ImageView fx:id="waterMinionView" fitWidth="130" fitHeight="130"
+                   preserveRatio="true" smooth="true">
+            <image><Image url="@../images/mainmenu/water_minion.png"/></image>
+        </ImageView>
+
+        <!-- Flying minions – initially hidden, animated left→right across top -->
+        <ImageView fx:id="angelMinionFly" fitWidth="110" fitHeight="110"
+                   preserveRatio="true" smooth="true" visible="false">
+            <image><Image url="@../images/mainmenu/angel_minion.png"/></image>
+        </ImageView>
+        <ImageView fx:id="birdMinionFly" fitWidth="110" fitHeight="110"
+                   preserveRatio="true" smooth="true" visible="false">
+            <image><Image url="@../images/mainmenu/bird_minion.png"/></image>
+        </ImageView>
+        <ImageView fx:id="witchMinionFly" fitWidth="110" fitHeight="110"
+                   preserveRatio="true" smooth="true" visible="false">
+            <image><Image url="@../images/mainmenu/witch_minion.png"/></image>
+        </ImageView>
+
+    </Pane>
 
     <VBox fx:id="menuButtons"
           alignment="CENTER"

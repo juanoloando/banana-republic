@@ -1,67 +1,73 @@
 {
-  "version": "1.0",
-  "timestamp": "2026-05-30T00:00:00Z",
-
-  "mapConfig": [
-    {"q":  0, "r":  0, "terrainType": "DESERT",       "tokenNumber": 0},
-    {"q":  1, "r":  0, "terrainType": "FOREST",       "tokenNumber": 5},
-    {"q":  1, "r": -1, "terrainType": "HILL",         "tokenNumber": 2},
-    {"q":  0, "r": -1, "terrainType": "FIELD",        "tokenNumber": 6},
-    {"q": -1, "r":  0, "terrainType": "MOUNTAIN",     "tokenNumber": 3},
-    {"q": -1, "r":  1, "terrainType": "BANANA_GROVE", "tokenNumber": 8},
-    {"q":  0, "r":  1, "terrainType": "FOREST",       "tokenNumber": 10},
-    {"q":  2, "r":  0, "terrainType": "FIELD",        "tokenNumber": 9},
-    {"q":  2, "r": -1, "terrainType": "MOUNTAIN",     "tokenNumber": 12},
-    {"q":  2, "r": -2, "terrainType": "FOREST",       "tokenNumber": 11},
-    {"q":  1, "r": -2, "terrainType": "BANANA_GROVE", "tokenNumber": 4},
-    {"q":  0, "r": -2, "terrainType": "HILL",         "tokenNumber": 8},
-    {"q": -1, "r": -1, "terrainType": "FIELD",        "tokenNumber": 10},
-    {"q": -2, "r":  0, "terrainType": "BANANA_GROVE", "tokenNumber": 9},
-    {"q": -2, "r":  1, "terrainType": "FOREST",       "tokenNumber": 4},
-    {"q": -2, "r":  2, "terrainType": "HILL",         "tokenNumber": 5},
-    {"q": -1, "r":  2, "terrainType": "FIELD",        "tokenNumber": 6},
-    {"q":  0, "r":  2, "terrainType": "MOUNTAIN",     "tokenNumber": 3},
-    {"q":  1, "r":  1, "terrainType": "BANANA_GROVE", "tokenNumber": 11}
-  ],
-
-  "harbors": [
-    {"harborType": "GENERAL", "intersectionIdA": 0,  "intersectionIdB": 1},
-    {"harborType": "WOOD",    "intersectionIdA": 3,  "intersectionIdB": 7},
-    {"harborType": "BANANA",  "intersectionIdA": 12, "intersectionIdB": 18},
-    {"harborType": "GENERAL", "intersectionIdA": 22, "intersectionIdB": 27},
-    {"harborType": "ORE",     "intersectionIdA": 33, "intersectionIdB": 38},
-    {"harborType": "GENERAL", "intersectionIdA": 42, "intersectionIdB": 47},
-    {"harborType": "WHEAT",   "intersectionIdA": 48, "intersectionIdB": 49},
-    {"harborType": "BRICK",   "intersectionIdA": 50, "intersectionIdB": 51},
-    {"harborType": "GENERAL", "intersectionIdA": 52, "intersectionIdB": 53}
-  ],
-
+  "version": "1.0.0",
+  "timestamp": "2026-06-05T10:23:32.534877102Z",
+  "currentPlayerIndex": 0,
+  "currentPhase": "TRADE_BUILD",
+  "roundNumber": 1,
+  "timerSecondsRemaining": 0,
   "robberQ": 0,
   "robberR": 0,
-
+  "longestRoadHolder": null,
+  "largestArmyHolder": null,
+  "currentLongestRoadLength": 0,
+  "currentLargestArmySize": 0,
+  "deckKnightCount": 25,
+  "deckProgressCount": 25,
+  "deckVictoryPointCount": 25,
+  "deckCustomCount": 25,
+  "bank": {
+    "ORE": 17,
+    "WOOD": 17,
+    "BRICK": 17,
+    "WHEAT": 18,
+    "BANANA": 15
+  },
+  "mapConfig": [
+    {"q":1,"r":0,"terrainType":"FOREST","tokenNumber":5},
+    {"q":0,"r":-1,"terrainType":"FIELD","tokenNumber":6},
+    {"q":0,"r":0,"terrainType":"DESERT","tokenNumber":0},
+    {"q":-1,"r":-1,"terrainType":"FIELD","tokenNumber":10},
+    {"q":1,"r":1,"terrainType":"BANANA_GROVE","tokenNumber":11},
+    {"q":-1,"r":0,"terrainType":"MOUNTAIN","tokenNumber":3},
+    {"q":0,"r":1,"terrainType":"FOREST","tokenNumber":10},
+    {"q":-1,"r":1,"terrainType":"BANANA_GROVE","tokenNumber":8},
+    {"q":-2,"r":0,"terrainType":"BANANA_GROVE","tokenNumber":9},
+    {"q":0,"r":2,"terrainType":"MOUNTAIN","tokenNumber":3},
+    {"q":-2,"r":1,"terrainType":"FOREST","tokenNumber":4},
+    {"q":-1,"r":2,"terrainType":"FIELD","tokenNumber":6},
+    {"q":-2,"r":2,"terrainType":"HILL","tokenNumber":5},
+    {"q":2,"r":-2,"terrainType":"FOREST","tokenNumber":11},
+    {"q":2,"r":-1,"terrainType":"MOUNTAIN","tokenNumber":12},
+    {"q":1,"r":-2,"terrainType":"BANANA_GROVE","tokenNumber":4},
+    {"q":1,"r":-1,"terrainType":"HILL","tokenNumber":2},
+    {"q":2,"r":0,"terrainType":"FIELD","tokenNumber":9},
+    {"q":0,"r":-2,"terrainType":"HILL","tokenNumber":8}
+  ],
+  "harbors": [
+    {"harborType":"GENERAL","intersectionIdA":0,"intersectionIdB":1},
+    {"harborType":"WOOD","intersectionIdA":3,"intersectionIdB":7},
+    {"harborType":"BANANA","intersectionIdA":12,"intersectionIdB":18},
+    {"harborType":"GENERAL","intersectionIdA":22,"intersectionIdB":27},
+    {"harborType":"ORE","intersectionIdA":33,"intersectionIdB":38},
+    {"harborType":"GENERAL","intersectionIdA":42,"intersectionIdB":47},
+    {"harborType":"WHEAT","intersectionIdA":48,"intersectionIdB":49},
+    {"harborType":"BRICK","intersectionIdA":50,"intersectionIdB":51},
+    {"harborType":"GENERAL","intersectionIdA":52,"intersectionIdB":53}
+  ],
   "players": [
     {
       "name": "Kebin",
       "color": "RED",
       "isBot": false,
       "botStrategyName": null,
-      "resources": {
-        "WOOD": 3,
-        "BRICK": 2,
-        "WHEAT": 1,
-        "ORE": 1,
-        "BANANA": 2
-      },
-      "buildings": [
-        {"intersectionId": 5,  "buildingType": "OUTPOST"},
-        {"intersectionId": 17, "buildingType": "LABORATORY"}
-      ],
-      "pipePathIds": [8, 12, 15],
-      "knightCardsInHand": 2,
-      "progressCardsInHand": 1,
-      "victoryPointCardsInHand": 1,
+      "knightCardsInHand": 0,
+      "progressCardsInHand": 0,
+      "victoryPointCardsInHand": 0,
       "customCardsInHand": 0,
-      "knightCardsPlayed": 1,
+      "knightCardsPlayed": 0,
+      "resources": {"ORE":1,"WOOD":2,"BRICK":1,"WHEAT":1,"BANANA":2},
+      "buildings": [{"intersectionId":3,"buildingType":"SETTLEMENT"}],
+      "pipePathIds": [2,18],
       "heldSpecialCards": []
     },
     {
@@ -69,20 +75,14 @@
       "color": "BLUE",
       "isBot": false,
       "botStrategyName": null,
-      "resources": {
-        "WOOD": 1,
-        "WHEAT": 2,
-        "ORE": 1
-      },
-      "buildings": [
-        {"intersectionId": 22, "buildingType": "OUTPOST"}
-      ],
-      "pipePathIds": [30, 31],
       "knightCardsInHand": 0,
-      "progressCardsInHand": 1,
+      "progressCardsInHand": 0,
       "victoryPointCardsInHand": 0,
       "customCardsInHand": 0,
       "knightCardsPlayed": 0,
+      "resources": {"ORE":0,"WOOD":1,"BRICK":0,"WHEAT":1,"BANANA":2},
+      "buildings": [{"intersectionId":5,"buildingType":"SETTLEMENT"}],
+      "pipePathIds": [4],
       "heldSpecialCards": []
     },
     {
@@ -90,44 +90,15 @@
       "color": "GREEN",
       "isBot": false,
       "botStrategyName": null,
-      "resources": {
-        "ORE": 3,
-        "BANANA": 1,
-        "WHEAT": 1
-      },
-      "buildings": [
-        {"intersectionId": 40, "buildingType": "OUTPOST"}
-      ],
-      "pipePathIds": [58, 59],
-      "knightCardsInHand": 1,
+      "knightCardsInHand": 0,
       "progressCardsInHand": 0,
       "victoryPointCardsInHand": 0,
       "customCardsInHand": 0,
       "knightCardsPlayed": 0,
+      "resources": {"ORE":2,"WOOD":0,"BRICK":1,"WHEAT":0,"BANANA":0},
+      "buildings": [{"intersectionId":8,"buildingType":"SETTLEMENT"}],
+      "pipePathIds": [7],
       "heldSpecialCards": []
     }
-  ],
-
-  "currentPlayerIndex": 0,
-  "currentPhase": "TRADE_BUILD",
-  "roundNumber": 3,
-  "timerSecondsRemaining": 75,
-
-  "bank": {
-    "WOOD":   16,
-    "BRICK":  17,
-    "WHEAT":  18,
-    "ORE":    17,
-    "BANANA": 16
-  },
-
-  "deckKnightCount": 11,
-  "deckProgressCount": 2,
-  "deckVictoryPointCount": 4,
-  "deckCustomCount": 0,
-
-  "longestRoadHolder": null,
-  "largestArmyHolder": null,
-  "currentLongestRoadLength": 3,
-  "currentLargestArmySize": 1
+  ]
 }

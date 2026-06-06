@@ -2,6 +2,7 @@
 
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.ToggleButton?>
 <?import javafx.scene.image.Image?>
@@ -9,6 +10,7 @@
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
 
 <StackPane xmlns="http://javafx.com/javafx"
            xmlns:fx="http://javafx.com/fxml"
@@ -30,7 +32,21 @@
                    preserveRatio="false"
                    smooth="true">
             <image>
-                <Image url="@../images/lobby/new_game_bg.png"/>
+                <Image url="@../images/lobby/new_game_revision.png"/>
+            </image>
+        </ImageView>
+
+        <ImageView fx:id="player4RowCover"
+                   layoutX="220"
+                   layoutY="552"
+                   fitWidth="430"
+                   fitHeight="92"
+                   preserveRatio="false"
+                   smooth="true"
+                   mouseTransparent="true"
+                   visible="false">
+            <image>
+                <Image url="@../images/lobby/player4_row_cover.png"/>
             </image>
         </ImageView>
 
@@ -63,30 +79,106 @@
         <TextField fx:id="player1NameField"
                    layoutX="299"
                    layoutY="397"
-                   prefWidth="285"
+                   prefWidth="230"
                    prefHeight="39"
                    styleClass="wood-input"/>
 
         <TextField fx:id="player2NameField"
                    layoutX="299"
                    layoutY="456"
-                   prefWidth="285"
+                   prefWidth="230"
                    prefHeight="39"
                    styleClass="wood-input"/>
 
         <TextField fx:id="player3NameField"
                    layoutX="299"
                    layoutY="516"
-                   prefWidth="285"
+                   prefWidth="230"
                    prefHeight="39"
                    styleClass="wood-input"/>
 
         <TextField fx:id="player4NameField"
                    layoutX="299"
                    layoutY="576"
-                   prefWidth="285"
+                   prefWidth="230"
                    prefHeight="39"
                    styleClass="wood-input"/>
+
+        <Button fx:id="player1BotButton"
+                layoutX="545"
+                layoutY="394"
+                prefWidth="38"
+                prefHeight="38"
+                onAction="#onPlayer1BotClicked"
+                styleClass="robot-button">
+            <graphic>
+                <ImageView fitWidth="32"
+                           fitHeight="32"
+                           preserveRatio="true"
+                           smooth="false">
+                    <image>
+                        <Image url="@../images/lobby/robot_button.png"/>
+                    </image>
+                </ImageView>
+            </graphic>
+        </Button>
+
+        <Button fx:id="player2BotButton"
+                layoutX="545"
+                layoutY="454"
+                prefWidth="38"
+                prefHeight="38"
+                onAction="#onPlayer2BotClicked"
+                styleClass="robot-button">
+            <graphic>
+                <ImageView fitWidth="32"
+                           fitHeight="32"
+                           preserveRatio="true"
+                           smooth="false">
+                    <image>
+                        <Image url="@../images/lobby/robot_button.png"/>
+                    </image>
+                </ImageView>
+            </graphic>
+        </Button>
+
+        <Button fx:id="player3BotButton"
+                layoutX="545"
+                layoutY="514"
+                prefWidth="38"
+                prefHeight="38"
+                onAction="#onPlayer3BotClicked"
+                styleClass="robot-button">
+            <graphic>
+                <ImageView fitWidth="32"
+                           fitHeight="32"
+                           preserveRatio="true"
+                           smooth="false">
+                    <image>
+                        <Image url="@../images/lobby/robot_button.png"/>
+                    </image>
+                </ImageView>
+            </graphic>
+        </Button>
+
+        <Button fx:id="player4BotButton"
+                layoutX="545"
+                layoutY="574"
+                prefWidth="38"
+                prefHeight="38"
+                onAction="#onPlayer4BotClicked"
+                styleClass="robot-button">
+            <graphic>
+                <ImageView fitWidth="32"
+                           fitHeight="32"
+                           preserveRatio="true"
+                           smooth="false">
+                    <image>
+                        <Image url="@../images/lobby/robot_button.png"/>
+                    </image>
+                </ImageView>
+            </graphic>
+        </Button>
 
         <!-- Environment Data label -->
         <Label fx:id="environmentFileLabel"
@@ -106,23 +198,21 @@
                 onAction="#onEnvironmentDataClicked"
                 styleClass="transparent-click-zone"/>
 
-        <!-- Automation Intelligence label -->
-        <Label fx:id="automationFileLabel"
-               layoutX="633"
-               layoutY="448"
-               prefWidth="372"
-               prefHeight="82"
-               text="No File Chosen"
-               mouseTransparent="true"
-               styleClass="plugin-file-label"/>
-
-        <!-- Automation Intelligence upload click zone -->
-        <Button layoutX="1002"
-                layoutY="463"
-                prefWidth="55"
-                prefHeight="47"
-                onAction="#onAutomationIntelligenceClicked"
-                styleClass="transparent-click-zone"/>
+        <!-- Automation Intelligence info -->
+        <ScrollPane layoutX="665"
+                    layoutY="438"
+                    prefWidth="380"
+                    prefHeight="142"
+                    fitToWidth="true"
+                    hbarPolicy="NEVER"
+                    vbarPolicy="AS_NEEDED"
+                    styleClass="automation-info-scroll">
+            <content>
+                <VBox fx:id="automationInfoBox"
+                      spacing="10"
+                      styleClass="automation-info-box"/>
+            </content>
+        </ScrollPane>
 
         <!-- Cancel button -->
         <Button layoutX="665"

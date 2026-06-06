@@ -14,6 +14,15 @@ import com.bananarepublic.view.card.UseCardOverlayManager;
 import com.bananarepublic.controller.GameController;
 import com.bananarepublic.controller.GameViewCallback;
 import com.bananarepublic.controller.GameSession;
+import com.bananarepublic.trade.BankTradeService;
+import com.bananarepublic.trade.HarborType;
+import com.bananarepublic.trade.HarborTradeService;
+import com.bananarepublic.trade.PlayerTradeService;
+import com.bananarepublic.trade.TradeMode;
+import com.bananarepublic.trade.TradeOffer;
+import com.bananarepublic.trade.TradeOverlayManager;
+import com.bananarepublic.trade.TradeOverlayRefs;
+import com.bananarepublic.trade.TradeResource;
 import com.bananarepublic.view.renderer.HexRevisionRenderer;
 import engine.DiceResult;
 import engine.TurnPhase;
@@ -238,7 +247,7 @@ public class GameRevisionView implements GameViewCallback {
 
     // ── Auto-roll countdown state ────────────────────────────────────
     private Timeline autoRollTimeline;
-    private static final int AUTO_ROLL_SECONDS = 10; // detik tanpa roll → auto-roll
+    private static final int AUTO_ROLL_SECONDS = 60;
 
     // ── Timer state ──────────────────────────────────────────────────
     private static final int DEFAULT_TURN_SECONDS = 90;
@@ -404,6 +413,9 @@ public class GameRevisionView implements GameViewCallback {
     private static final String TRADE_COUNTER_IMAGE_PATH = "/com/bananarepublic/images/trade/Counter Offer.png";
     private static final String TRADE_REVIEW_COUNTER_IMAGE_PATH = "/com/bananarepublic/images/trade/Review Counter.png";
     private static final String TRADE_INFORMATION_IMAGE_PATH = "/com/bananarepublic/images/trade/information.png";
+    private static final String DECLARE_VICTORY_CONFIRMATION_IMAGE_PATH = "/com/bananarepublic/images/trade/Declare Victory.png";
+    private static final String VICTORY_CONFIRM_BUTTON_IMAGE_PATH = "/com/bananarepublic/images/trade/btn_confirm.png";
+    private static final String VICTORY_CANCEL_BUTTON_IMAGE_PATH = "/com/bananarepublic/images/trade/btn_cancel.png";
     private static final String PLAYER_PROFILE_BASE_PATH = "/com/bananarepublic/images/trade/profilepictPlayer%d.png";
     private static final double TRADE_OFFER_ASSET_WIDTH = 926.0;
     private static final double TRADE_OFFER_ASSET_HEIGHT = 1124.0;
@@ -438,31 +450,10 @@ public class GameRevisionView implements GameViewCallback {
             ResourceType.BRICK
     );
 
-    private enum TradeMode {
-        NONE,
-        CHOICE,
-        PLAYER_TRADE,
-        BANK_TRADE,
-        HARBOR_TRADE,
-        TRADE_OFFER_REVIEW,
-        COUNTER_OFFER,
-        REVIEW_COUNTER,
-        INFORMATION
-    }
-
     private enum InformationCloseAction {
         RETURN_TO_GAME,
         RETURN_TO_TRADE_CHOICE,
         RETURN_TO_BANK_TRADE
-    }
-
-    private enum TradeHarborType {
-        GENERAL,
-        BANANA,
-        WOOD,
-        BRICK,
-        WHEAT,
-        ORE
     }
 
     private enum ResourceTypeUI {
@@ -473,25 +464,15 @@ public class GameRevisionView implements GameViewCallback {
         BRICK
     }
 
-    private static class TradeOfferState {
-        int proposerIndex;
-        int receiverIndex;
-        EnumMap<ResourceType, Integer> give = new EnumMap<>(ResourceType.class);
-        EnumMap<ResourceType, Integer> receive = new EnumMap<>(ResourceType.class);
-        boolean counter;
-    }
-
     private TradeMode currentTradeMode = TradeMode.NONE;
-    private TradeOfferState currentOffer;
+    private TradeOffer currentOffer;
     private int currentProposerIndex = 0;
     private int currentReceiverIndex = 1;
     private int selectedTargetIndex = -1;
-    private ResourceType selectedBankGiveResource;
-    private ResourceType selectedBankReceiveResource;
-    private TradeHarborType selectedHarborType;
+    private HarborType selectedHarborType;
     private ResourceType selectedHarborGiveResource;
     private ResourceType selectedHarborReceiveResource;
-    private Set<TradeHarborType> availableHarbors = new HashSet<>();
+    private Set<HarborType> availableHarbors = new HashSet<>();
     private final EnumMap<ResourceType, Integer> giveResourceQuantities = new EnumMap<>(ResourceType.class);
     private final EnumMap<ResourceType, Integer> receiveResourceQuantities = new EnumMap<>(ResourceType.class);
     private final EnumMap<ResourceType, Integer> counterGiveQuantities = new EnumMap<>(ResourceType.class);
@@ -501,10 +482,16 @@ public class GameRevisionView implements GameViewCallback {
     private int counterResponderIndex = -1;
     private ResourceTypeUI selectedBankReceiveResourceUi;
     private ResourceTypeUI selectedPlayerGiveResourceUi;
-    private final EnumMap<ResourceTypeUI, Integer> dummyPlayerResources = new EnumMap<>(ResourceTypeUI.class);
-    private final EnumMap<ResourceTypeUI, Integer> dummyBankResources = new EnumMap<>(ResourceTypeUI.class);
-    private final List<String> dummyTradeNames = List.of("Kebin", "Stewart", "Bob", "Toto");
+    private final EnumMap<ResourceTypeUI, Integer> bankTradePlayerResources = new EnumMap<>(ResourceTypeUI.class);
+    private final EnumMap<ResourceTypeUI, Integer> bankTradeBankResources = new EnumMap<>(ResourceTypeUI.class);
+    private final BankTradeService bankTradeService = new BankTradeService();
+    private final HarborTradeService harborTradeService = new HarborTradeService();
+    private final PlayerTradeService playerTradeService = new PlayerTradeService();
+    private TradeOverlayManager tradeOverlayManager;
     private InformationCloseAction informationCloseAction = InformationCloseAction.RETURN_TO_GAME;
+    private int pendingVictoryPlayerIndex = -1;
+    private boolean victoryConfirmationVisible;
+    private boolean victoryDeclarationConfirmed;
     private double currentPopupLogicalWidth = POPUP_ASSET_WIDTH;
     private double currentPopupLogicalHeight = POPUP_ASSET_HEIGHT;
 
@@ -533,6 +520,7 @@ public class GameRevisionView implements GameViewCallback {
         initBankStock();
         initializeTradeState();
         setupBankTradeClickZones();
+        initializeTradeOverlayManager();
         configureTradeModalSize(POPUP_ASSET_WIDTH, POPUP_ASSET_HEIGHT);
         updatePhaseDisplay(false);
         hidePopup();
@@ -578,6 +566,34 @@ public class GameRevisionView implements GameViewCallback {
                 }
             });
         }
+    }
+
+    private void initializeTradeOverlayManager() {
+        TradeOverlayRefs refs = new TradeOverlayRefs(
+                tradeOverlayRoot,
+                tradeOverlayCenterLayer,
+                tradeModalScaleGroup,
+                popupOverlay,
+                tradePopupContainer,
+                tradeChoiceBankButton,
+                tradeChoicePlayerButton,
+                tradeChoiceHarborButton,
+                tradeUiPane,
+                tradeErrorLabel,
+                playerTradeMessageLabel,
+                tradeActionButtonsBox,
+                bankTradeMessageLabel,
+                bankTradeCancelButton,
+                bankTradeConfirmButton);
+
+        tradeOverlayManager = new TradeOverlayManager(
+                refs,
+                this::showTradeChoice,
+                this::showBankTrade,
+                this::showPlayerTrade,
+                this::showHarborTrade,
+                this::hideTradeOverlay,
+                this::appendLog);
     }
 
     private void setupCardSystem() {
@@ -631,9 +647,10 @@ public class GameRevisionView implements GameViewCallback {
 
             @Override
             public boolean isRoadBuildingEffectInProgress(int playerIndex) {
-                return gameController != null
-                        && gameController.getCurrentPlayerIdx() == playerIndex
-                        && gameController.getCurrentPhase() == TurnPhase.TRADE_BUILD
+                if (gameController == null) return false;
+                if (gameController.getCurrentPlayerIdx() != playerIndex) return false;
+                TurnPhase ph = gameController.getCurrentPhase();
+                return (ph == TurnPhase.TRADE_BUILD || ph == TurnPhase.ROLL_DICE)
                         && gameController.getFreeRoadsRemaining() > 0;
             }
 
@@ -666,6 +683,9 @@ public class GameRevisionView implements GameViewCallback {
                     }
                     syncAllPlayerStocksFromEngine();
                     syncCardInventoriesFromEngine();
+                    if (type == CardType.ROAD_BUILDING) {
+                        tryAutoEnterBuildMode();
+                    }
                     return CardUseResult.success("Card played.", true, false);
                 } catch (RuntimeException | AssertionError e) {
                     return CardUseResult.fail(e.getMessage() == null ? "Failed to use card." : e.getMessage());
@@ -701,6 +721,13 @@ public class GameRevisionView implements GameViewCallback {
                     }
                 }
                 usedCardTracker.setPlayedKnightCount(i, hp.getInventory().getKnightCardsPlayed());
+                for (model.player.SpecialCard sc : hp.getHeldSpecialCards()) {
+                    if (sc == model.player.SpecialCard.LONGEST_ROAD) {
+                        inventory.setQuantity(CardType.LONGEST_ROAD, 1);
+                    } else if (sc == model.player.SpecialCard.LARGEST_ARMY) {
+                        inventory.setQuantity(CardType.LARGEST_ARMY, 1);
+                    }
+                }
             }
         }
     }
@@ -720,23 +747,23 @@ public class GameRevisionView implements GameViewCallback {
         return isTradeBuildPhase();
     }
 
-    private boolean applyBuyExperimentCardCost() {
+    private model.card.ExperimentCard applyBuyExperimentCardCost() {
         if (gameController != null) {
             try {
-                gameController.buyExperimentCard();
+                model.card.ExperimentCard card = gameController.buyExperimentCard();
                 // Engine fires onCardBought callback → refreshes inventory + stats
                 syncAllPlayerStocksFromEngine();
-                initializeBankTradeDummyData();
-                return true;
+                initializeBankTradeResourceSnapshot();
+                return card;
             } catch (Exception e) {
                 appendLog("Cannot buy card: " + e.getMessage());
-                return false;
+                return null;
             }
         }
         // Fallback: no engine — update local stocks only
-        if (getResourceAmount(activePlayerIndex, ResourceType.ORE) < 1) return false;
-        if (getResourceAmount(activePlayerIndex, ResourceType.BANANA) < 1) return false;
-        if (getResourceAmount(activePlayerIndex, ResourceType.WHEAT) < 1) return false;
+        if (getResourceAmount(activePlayerIndex, ResourceType.ORE) < 1) return null;
+        if (getResourceAmount(activePlayerIndex, ResourceType.BANANA) < 1) return null;
+        if (getResourceAmount(activePlayerIndex, ResourceType.WHEAT) < 1) return null;
         addResourceAmount(activePlayerIndex, ResourceType.ORE, -1);
         addResourceAmount(activePlayerIndex, ResourceType.BANANA, -1);
         addResourceAmount(activePlayerIndex, ResourceType.WHEAT, -1);
@@ -744,8 +771,8 @@ public class GameRevisionView implements GameViewCallback {
         addBankResourceAmount(ResourceType.BANANA, 1);
         addBankResourceAmount(ResourceType.WHEAT, 1);
         syncTradeStateBackToSaveData();
-        initializeBankTradeDummyData();
-        return true;
+        initializeBankTradeResourceSnapshot();
+        return model.card.CardFactory.createKnight();
     }
 
     private void setupRollDiceManualOverlay() {
@@ -763,7 +790,7 @@ public class GameRevisionView implements GameViewCallback {
     private void setupDeclareVictoryOverlay() {
         if (declareVictoryOverlayController == null) return;
         declareVictoryOverlayController.configure(
-                () -> activePlayerIndex,
+                () -> pendingVictoryPlayerIndex >= 0 ? pendingVictoryPlayerIndex : activePlayerIndex,
                 this::buildVictoryLeaderboardEntries,
                 message -> showInformationPopup(message, InformationCloseAction.RETURN_TO_GAME),
                 () -> {
@@ -777,9 +804,16 @@ public class GameRevisionView implements GameViewCallback {
         );
     }
 
-    private boolean saveGameFromVictoryOverlay() {
-        // TODO: connect to real persistence save service.
-        return true;
+    private boolean saveGameFromVictoryOverlay(java.io.File file) {
+        if (gameController == null || file == null) {
+            return false;
+        }
+
+        boolean success = gameController.saveGame(file);
+        if (success) {
+            appendLog("Game saved: " + file.getName());
+        }
+        return success;
     }
 
     private List<DeclareVictoryOverlay.VictoryLeaderboardEntry> buildVictoryLeaderboardEntries() {
@@ -800,12 +834,11 @@ public class GameRevisionView implements GameViewCallback {
             }
         }
 
-        int[] dummyVictoryPoints = {10, 8, 6, 4};
         for (int i = 0; i < totalPlayers; i++) {
             int playerIndex = i;
             int oneBasedIndex = i + 1;
             String playerName = getPlayerNameForIndex(oneBasedIndex);
-            int victoryPoints = hasRealVictoryPointData ? labelVictoryPoints[i] : dummyVictoryPoints[i];
+            int victoryPoints = hasRealVictoryPointData ? labelVictoryPoints[i] : 0;
             Image profileImage = loadVictoryProfileImage(oneBasedIndex);
             entries.add(new DeclareVictoryOverlay.VictoryLeaderboardEntry(
                     playerIndex,
@@ -1028,11 +1061,14 @@ public class GameRevisionView implements GameViewCallback {
                         refreshResourceCards(resCounts);
                     }
                 }
-                refreshPlayerStatusCards(i + 1,
-                    pd.knightCardsInHand,
-                    pd.progressCardsInHand,
-                    pd.victoryPointCardsInHand
-                );
+                java.util.Collection<model.player.SpecialCard> savedSpecials = new java.util.ArrayList<>();
+                if (pd.heldSpecialCards != null) {
+                    for (String s : pd.heldSpecialCards) {
+                        try { savedSpecials.add(model.player.SpecialCard.valueOf(s.toUpperCase())); }
+                        catch (IllegalArgumentException ignored) {}
+                    }
+                }
+                refreshPlayerStatusCards(i + 1, savedSpecials);
             }
             // Populate stat labels (VP, Outpost, Lab, Knight, Pipe) for all players
             populatePlayerStats(saveData);
@@ -1113,18 +1149,16 @@ public class GameRevisionView implements GameViewCallback {
      * Call from FX thread or wrap with Platform.runLater.
      */
     public void refreshPlayerStatusCards(int playerIndex,
-                                          int knightCards, int progressCards, int vpCards) {
+                                          java.util.Collection<model.player.SpecialCard> specialCards) {
         HBox box = playerCardBoxes.get(playerIndex);
         if (box == null) return;
         box.getChildren().clear();
-        // Tampilkan indikator card utama di row player (fokus: Knight).
-        addStatusCard(box, knightCards, CardType.KNIGHT);
-    }
-
-    private void addStatusCard(HBox box, int count, CardType type) {
-        if (count <= 0) return;
-        StackPane card = buildSmallCard(type, count);
-        box.getChildren().add(card);
+        if (specialCards == null) return;
+        for (model.player.SpecialCard sc : specialCards) {
+            CardType type = (sc == model.player.SpecialCard.LONGEST_ROAD)
+                ? CardType.LONGEST_ROAD : CardType.LARGEST_ARMY;
+            box.getChildren().add(buildSmallCard(type, 0));
+        }
     }
 
     /** Small card variant for player status rows. */
@@ -1331,21 +1365,15 @@ public class GameRevisionView implements GameViewCallback {
         }
 
         // UI-first fallback for trade screen testing — only when no live engine is connected.
-        if (gameController == null && shouldUseDummyTradeData()) {
-            applyDummyTradeData();
-        }
-
         // If engine is available, sync real resource counts now
         if (gameController != null) {
             syncAllPlayerStocksFromEngine();
         }
 
-        initializeBankTradeDummyData();
+        initializeBankTradeResourceSnapshot();
 
         resetTradeDraftQuantities();
         selectedTargetIndex = -1;
-        selectedBankGiveResource = null;
-        selectedBankReceiveResource = null;
         selectedHarborType = null;
         selectedHarborGiveResource = null;
         selectedHarborReceiveResource = null;
@@ -1357,73 +1385,27 @@ public class GameRevisionView implements GameViewCallback {
                 : currentProposerIndex;
     }
 
-    private void initializeBankTradeDummyData() {
-        dummyPlayerResources.clear();
-        dummyBankResources.clear();
+    private void initializeBankTradeResourceSnapshot() {
+        bankTradePlayerResources.clear();
+        bankTradeBankResources.clear();
 
         for (ResourceTypeUI resourceTypeUI : ResourceTypeUI.values()) {
-            dummyPlayerResources.put(resourceTypeUI, 0);
-            dummyBankResources.put(resourceTypeUI, 0);
+            bankTradePlayerResources.put(resourceTypeUI, 0);
+            bankTradeBankResources.put(resourceTypeUI, 0);
         }
 
         // TODO: replace with real GameState/Player/Bank adapter once engine API is ready.
-        dummyPlayerResources.put(ResourceTypeUI.BANANA, getResourceAmount(activePlayerIndex, ResourceType.BANANA));
-        dummyPlayerResources.put(ResourceTypeUI.WOOD, getResourceAmount(activePlayerIndex, ResourceType.WOOD));
-        dummyPlayerResources.put(ResourceTypeUI.WHEAT, getResourceAmount(activePlayerIndex, ResourceType.WHEAT));
-        dummyPlayerResources.put(ResourceTypeUI.ORE, getResourceAmount(activePlayerIndex, ResourceType.ORE));
-        dummyPlayerResources.put(ResourceTypeUI.BRICK, getResourceAmount(activePlayerIndex, ResourceType.BRICK));
+        bankTradePlayerResources.put(ResourceTypeUI.BANANA, getResourceAmount(activePlayerIndex, ResourceType.BANANA));
+        bankTradePlayerResources.put(ResourceTypeUI.WOOD, getResourceAmount(activePlayerIndex, ResourceType.WOOD));
+        bankTradePlayerResources.put(ResourceTypeUI.WHEAT, getResourceAmount(activePlayerIndex, ResourceType.WHEAT));
+        bankTradePlayerResources.put(ResourceTypeUI.ORE, getResourceAmount(activePlayerIndex, ResourceType.ORE));
+        bankTradePlayerResources.put(ResourceTypeUI.BRICK, getResourceAmount(activePlayerIndex, ResourceType.BRICK));
 
-        dummyBankResources.put(ResourceTypeUI.BANANA, getBankResourceAmount(ResourceType.BANANA));
-        dummyBankResources.put(ResourceTypeUI.WOOD, getBankResourceAmount(ResourceType.WOOD));
-        dummyBankResources.put(ResourceTypeUI.WHEAT, getBankResourceAmount(ResourceType.WHEAT));
-        dummyBankResources.put(ResourceTypeUI.ORE, getBankResourceAmount(ResourceType.ORE));
-        dummyBankResources.put(ResourceTypeUI.BRICK, getBankResourceAmount(ResourceType.BRICK));
-    }
-
-    private boolean shouldUseDummyTradeData() {
-        boolean anyPlayerHasResources = false;
-        for (EnumMap<ResourceType, Integer> stock : playerResourceStocks) {
-            for (ResourceType resourceType : TRADE_RESOURCE_ORDER) {
-                if (stock.getOrDefault(resourceType, 0) > 0) {
-                    anyPlayerHasResources = true;
-                    break;
-                }
-            }
-            if (anyPlayerHasResources) break;
-        }
-
-        boolean bankConfigured = false;
-        for (ResourceType resourceType : TRADE_RESOURCE_ORDER) {
-            if (bankStock.getOrDefault(resourceType, 0) > 0) {
-                bankConfigured = true;
-                break;
-            }
-        }
-
-        return !anyPlayerHasResources || !bankConfigured;
-    }
-
-    private void applyDummyTradeData() {
-        ensurePlayerStockCapacity(4);
-
-        setDummyPlayerStock(0, 5, 4, 3, 2, 4);
-        setDummyPlayerStock(1, 2, 3, 1, 4, 2);
-        setDummyPlayerStock(2, 1, 5, 3, 1, 0);
-        setDummyPlayerStock(3, 4, 1, 2, 2, 3);
-
-        for (ResourceType resourceType : TRADE_RESOURCE_ORDER) {
-            bankStock.put(resourceType, 15);
-        }
-    }
-
-    private void setDummyPlayerStock(int index, int banana, int wood, int wheat, int ore, int brick) {
-        if (index < 0 || index >= playerResourceStocks.size()) return;
-        EnumMap<ResourceType, Integer> stock = playerResourceStocks.get(index);
-        stock.put(ResourceType.BANANA, banana);
-        stock.put(ResourceType.WOOD, wood);
-        stock.put(ResourceType.WHEAT, wheat);
-        stock.put(ResourceType.ORE, ore);
-        stock.put(ResourceType.BRICK, brick);
+        bankTradeBankResources.put(ResourceTypeUI.BANANA, getBankResourceAmount(ResourceType.BANANA));
+        bankTradeBankResources.put(ResourceTypeUI.WOOD, getBankResourceAmount(ResourceType.WOOD));
+        bankTradeBankResources.put(ResourceTypeUI.WHEAT, getBankResourceAmount(ResourceType.WHEAT));
+        bankTradeBankResources.put(ResourceTypeUI.ORE, getBankResourceAmount(ResourceType.ORE));
+        bankTradeBankResources.put(ResourceTypeUI.BRICK, getBankResourceAmount(ResourceType.BRICK));
     }
 
     private void ensurePlayerStockCapacity(int size) {
@@ -1504,8 +1486,6 @@ public class GameRevisionView implements GameViewCallback {
 
     private void resetTemporaryTradeState() {
         selectedTargetIndex = -1;
-        selectedBankGiveResource = null;
-        selectedBankReceiveResource = null;
         selectedBankReceiveResourceUi = null;
         selectedPlayerGiveResourceUi = null;
         selectedHarborType = null;
@@ -1620,6 +1600,141 @@ public class GameRevisionView implements GameViewCallback {
 
         tradeUiPane.getChildren().addAll(messageLabel, closeButton);
         tradeUiPane.toFront();
+    }
+
+    private void showDeclareVictoryConfirmationPopup(int playerIndex) {
+        if (victoryConfirmationVisible) {
+            return;
+        }
+        if (declareVictoryOverlayController == null) {
+            showInformationPopup("Declare Victory screen is not available.",
+                    InformationCloseAction.RETURN_TO_GAME);
+            return;
+        }
+
+        pendingVictoryPlayerIndex = Math.max(0, playerIndex);
+        victoryConfirmationVisible = true;
+
+        hideAllTradeControls();
+        currentTradeMode = TradeMode.INFORMATION;
+        informationCloseAction = InformationCloseAction.RETURN_TO_GAME;
+
+        showPopupImage(DECLARE_VICTORY_CONFIRMATION_IMAGE_PATH);
+        setTradeOverlayContentVisible(true);
+        tradeUiPane.getChildren().clear();
+        hideTradeActions();
+        setBankTradeActionButtonsVisible(false);
+        clearPlayerTradeMessage();
+        clearTradeError();
+
+        popupCloseButton.setVisible(false);
+        popupCloseButton.setManaged(false);
+        popupCloseButton.setDisable(true);
+        popupCloseButton.setMouseTransparent(true);
+
+        Label messageLabel = new Label("Do you want to declare your victory?");
+        messageLabel.getStyleClass().add("trade-info-message-label");
+        messageLabel.setWrapText(true);
+        messageLabel.setAlignment(Pos.CENTER);
+        messageLabel.setPrefWidth(currentPopupLogicalWidth * 0.72);
+        messageLabel.setPrefHeight(currentPopupLogicalHeight * 0.20);
+        messageLabel.setLayoutX((currentPopupLogicalWidth - messageLabel.getPrefWidth()) / 2.0);
+        messageLabel.setLayoutY(currentPopupLogicalHeight * 0.43);
+
+        double buttonWidth = Math.min(205.0, currentPopupLogicalWidth * 0.32);
+        double buttonHeight = buttonWidth * 0.30;
+        double buttonGap = currentPopupLogicalWidth * 0.035;
+        double buttonsWidth = buttonWidth * 2.0 + buttonGap;
+        double buttonY = currentPopupLogicalHeight - buttonHeight - currentPopupLogicalHeight * 0.10;
+        double cancelX = (currentPopupLogicalWidth - buttonsWidth) / 2.0;
+        double confirmX = cancelX + buttonWidth + buttonGap;
+
+        ImageView cancelImage = createVictoryConfirmationButtonImage(
+                VICTORY_CANCEL_BUTTON_IMAGE_PATH, cancelX, buttonY, buttonWidth, buttonHeight);
+        ImageView confirmImage = createVictoryConfirmationButtonImage(
+                VICTORY_CONFIRM_BUTTON_IMAGE_PATH, confirmX, buttonY, buttonWidth, buttonHeight);
+
+        Button cancelButton = createVictoryConfirmationHitbox(
+                cancelX, buttonY, buttonWidth, buttonHeight, this::cancelVictoryConfirmation);
+        Button confirmButton = createVictoryConfirmationHitbox(
+                confirmX, buttonY, buttonWidth, buttonHeight, this::confirmVictoryDeclaration);
+
+        tradeUiPane.getChildren().addAll(
+                messageLabel,
+                cancelImage,
+                confirmImage,
+                cancelButton,
+                confirmButton);
+        tradeUiPane.toFront();
+    }
+
+    private ImageView createVictoryConfirmationButtonImage(
+            String imagePath,
+            double x,
+            double y,
+            double width,
+            double height) {
+        ImageView imageView = new ImageView(new Image(getClass().getResource(imagePath).toExternalForm()));
+        imageView.setLayoutX(x);
+        imageView.setLayoutY(y);
+        imageView.setFitWidth(width);
+        imageView.setFitHeight(height);
+        imageView.setPreserveRatio(false);
+        imageView.setMouseTransparent(true);
+        return imageView;
+    }
+
+    private Button createVictoryConfirmationHitbox(
+            double x,
+            double y,
+            double width,
+            double height,
+            Runnable action) {
+        Button button = new Button();
+        button.getStyleClass().add("trade-click-zone");
+        button.setOpacity(0.0);
+        button.setLayoutX(x);
+        button.setLayoutY(y);
+        button.setPrefWidth(width);
+        button.setPrefHeight(height);
+        button.setOnAction(event -> action.run());
+        return button;
+    }
+
+    private void cancelVictoryConfirmation() {
+        pendingVictoryPlayerIndex = -1;
+        victoryConfirmationVisible = false;
+        hidePopup();
+    }
+
+    private void confirmVictoryDeclaration() {
+        int winnerIndex = pendingVictoryPlayerIndex;
+        victoryConfirmationVisible = false;
+        hidePopup();
+
+        try {
+            if (gameController != null) {
+                List<Player> players = gameController.getAllPlayers();
+                if (winnerIndex < 0 || winnerIndex >= players.size()) {
+                    throw new IllegalStateException("Winning player is unavailable.");
+                }
+                victoryDeclarationConfirmed = true;
+                gameController.confirmVictory(players.get(winnerIndex));
+            }
+
+            stopTimer();
+            stopAutoRollCountdown();
+            if (declareVictoryOverlayController != null) {
+                pendingVictoryPlayerIndex = winnerIndex;
+                declareVictoryOverlayController.showDeclareVictoryScreen();
+            }
+        } catch (Exception exception) {
+            victoryDeclarationConfirmed = false;
+            showInformationPopup("Failed to declare victory.",
+                    InformationCloseAction.RETURN_TO_GAME);
+        } finally {
+            pendingVictoryPlayerIndex = -1;
+        }
     }
 
     private void setBankTradeControlsVisible(boolean visible) {
@@ -1737,9 +1852,6 @@ public class GameRevisionView implements GameViewCallback {
         if (oneBasedIndex >= 1 && oneBasedIndex <= names.size()) {
             return names.get(oneBasedIndex - 1);
         }
-        if (oneBasedIndex >= 1 && oneBasedIndex <= dummyTradeNames.size()) {
-            return dummyTradeNames.get(oneBasedIndex - 1);
-        }
         return "Player " + oneBasedIndex;
     }
 
@@ -1779,16 +1891,6 @@ public class GameRevisionView implements GameViewCallback {
             sum += Math.max(0, quantities.getOrDefault(resourceType, 0));
         }
         return sum;
-    }
-
-    private boolean playerHasEnough(int playerIndex, Map<ResourceType, Integer> needed) {
-        for (ResourceType resourceType : TRADE_RESOURCE_ORDER) {
-            int ask = needed.getOrDefault(resourceType, 0);
-            if (ask > getResourceAmount(playerIndex, resourceType)) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private boolean hasSharedResourceSelection() {
@@ -2184,8 +2286,6 @@ public class GameRevisionView implements GameViewCallback {
         for (int i = 0; i < totalPlayers; i++) {
             if (i < sessionNames.size() && sessionNames.get(i) != null && !sessionNames.get(i).isBlank()) {
                 names.add(sessionNames.get(i));
-            } else if (i < dummyTradeNames.size()) {
-                names.add(dummyTradeNames.get(i));
             } else {
                 names.add("Player " + (i + 1));
             }
@@ -2305,35 +2405,13 @@ public class GameRevisionView implements GameViewCallback {
     }
 
     private String validatePlayerTrade() {
-        if (selectedTargetIndex < 0 || selectedTargetIndex >= playerResourceStocks.size()
-                || selectedTargetIndex == currentProposerIndex) {
-            return "Please select a target player.";
-        }
-        if (sumResourceQuantities(giveResourceQuantities) <= 0) {
-            return "Please select at least one resource to give.";
-        }
-        if (sumResourceQuantities(receiveResourceQuantities) <= 0) {
-            return "Please select at least one resource to receive.";
-        }
-        for (ResourceType resourceType : TRADE_RESOURCE_ORDER) {
-            if (giveResourceQuantities.getOrDefault(resourceType, 0) > 0
-                    && receiveResourceQuantities.getOrDefault(resourceType, 0) > 0) {
-                return "You cannot trade the same resource.";
-            }
-        }
-        for (ResourceType resourceType : TRADE_RESOURCE_ORDER) {
-            int askGive = giveResourceQuantities.getOrDefault(resourceType, 0);
-            if (askGive > getResourceAmount(currentProposerIndex, resourceType)) {
-                return "Not enough " + displayResource(resourceType) + ".";
-            }
-        }
-        for (ResourceType resourceType : TRADE_RESOURCE_ORDER) {
-            int askReceive = receiveResourceQuantities.getOrDefault(resourceType, 0);
-            if (askReceive > getResourceAmount(selectedTargetIndex, resourceType)) {
-                return "Target player does not have enough " + displayResource(resourceType) + ".";
-            }
-        }
-        return null;
+        return playerTradeService.validate(
+                currentProposerIndex,
+                selectedTargetIndex,
+                playerResourceStocks,
+                giveResourceQuantities,
+                receiveResourceQuantities,
+                TRADE_RESOURCE_ORDER);
     }
 
     private void onPlayerTradeCancelClicked() {
@@ -2351,7 +2429,7 @@ public class GameRevisionView implements GameViewCallback {
         clearPlayerTradeMessage();
         currentReceiverIndex = selectedTargetIndex;
 
-        TradeOfferState offer = new TradeOfferState();
+        TradeOffer offer = new TradeOffer();
         offer.proposerIndex = currentProposerIndex;
         offer.receiverIndex = selectedTargetIndex;
         offer.give.putAll(giveResourceQuantities);
@@ -2507,10 +2585,8 @@ public class GameRevisionView implements GameViewCallback {
         return row;
     }
 
-    private boolean canExecuteOffer(TradeOfferState offer) {
-        if (offer == null) return false;
-        return playerHasEnough(offer.proposerIndex, offer.give)
-                && playerHasEnough(offer.receiverIndex, offer.receive);
+    private boolean canExecuteOffer(TradeOffer offer) {
+        return playerTradeService.canExecuteOffer(offer, playerResourceStocks);
     }
 
     private void showCounterOffer() {
@@ -2805,7 +2881,7 @@ public class GameRevisionView implements GameViewCallback {
 
         clearCounterOfferMessage();
 
-        TradeOfferState offer = new TradeOfferState();
+        TradeOffer offer = new TradeOffer();
         offer.proposerIndex = counterProposerIndex;
         offer.receiverIndex = counterResponderIndex;
         offer.give.putAll(counterGiveQuantities);
@@ -3142,7 +3218,7 @@ public class GameRevisionView implements GameViewCallback {
             youSelect.setOnAction(e -> onYouResourceClicked(resourceTypeUI));
             youSelect.setFocusTraversable(false);
 
-            Label bankQty = new Label(String.valueOf(dummyBankResources.getOrDefault(resourceTypeUI, 0)));
+            Label bankQty = new Label(String.valueOf(bankTradeBankResources.getOrDefault(resourceTypeUI, 0)));
             bankQty.setStyle("-fx-text-fill: #2f2010; -fx-font-size: 18px; -fx-font-weight: bold;");
             bankQty.setAlignment(Pos.CENTER);
             bankQty.setLayoutX(centerX - (BANK_QTY_W * avgScale) / 2.0);
@@ -3151,7 +3227,7 @@ public class GameRevisionView implements GameViewCallback {
             bankQty.setPrefHeight(BANK_QTY_H * avgScale);
             bankQty.setMouseTransparent(true);
 
-            Label youQty = new Label(String.valueOf(dummyPlayerResources.getOrDefault(resourceTypeUI, 0)));
+            Label youQty = new Label(String.valueOf(bankTradePlayerResources.getOrDefault(resourceTypeUI, 0)));
             youQty.setStyle("-fx-text-fill: #2f2010; -fx-font-size: 18px; -fx-font-weight: bold;");
             youQty.setAlignment(Pos.CENTER);
             youQty.setLayoutX(centerX - (BANK_QTY_W * avgScale) / 2.0);
@@ -3241,28 +3317,11 @@ public class GameRevisionView implements GameViewCallback {
     }
 
     private String validateBankTrade() {
-        if (selectedBankReceiveResourceUi == null) {
-            return "Please select a resource from bank.";
-        }
-        if (selectedPlayerGiveResourceUi == null) {
-            return "Please select a resource from you.";
-        }
-        if (selectedBankReceiveResourceUi == selectedPlayerGiveResourceUi) {
-            return "You cannot trade the same resource.";
-        }
-
-        int playerAmount = dummyPlayerResources.getOrDefault(selectedPlayerGiveResourceUi, 0);
-        if (playerAmount < 4) {
-            String name = displayResource(selectedPlayerGiveResourceUi);
-            return "Not enough " + name + ". You need 4 " + name + ".";
-        }
-
-        int bankAmount = dummyBankResources.getOrDefault(selectedBankReceiveResourceUi, 0);
-        if (bankAmount < 1) {
-            return "Bank does not have enough " + displayResource(selectedBankReceiveResourceUi) + ".";
-        }
-
-        return null;
+        return bankTradeService.validate(
+                toTradeResource(selectedBankReceiveResourceUi),
+                toTradeResource(selectedPlayerGiveResourceUi),
+                toTradeResourceMap(bankTradePlayerResources),
+                toTradeResourceMap(bankTradeBankResources));
     }
 
     private void applyBankTradeToMainStocks() {
@@ -3270,10 +3329,10 @@ public class GameRevisionView implements GameViewCallback {
         ResourceType receive = toModelResource(selectedBankReceiveResourceUi);
         if (give == null || receive == null) return;
 
-        int givePlayer = dummyPlayerResources.getOrDefault(selectedPlayerGiveResourceUi, 0);
-        int giveBank = dummyBankResources.getOrDefault(selectedPlayerGiveResourceUi, 0);
-        int receivePlayer = dummyPlayerResources.getOrDefault(selectedBankReceiveResourceUi, 0);
-        int receiveBank = dummyBankResources.getOrDefault(selectedBankReceiveResourceUi, 0);
+        int givePlayer = bankTradePlayerResources.getOrDefault(selectedPlayerGiveResourceUi, 0);
+        int giveBank = bankTradeBankResources.getOrDefault(selectedPlayerGiveResourceUi, 0);
+        int receivePlayer = bankTradePlayerResources.getOrDefault(selectedBankReceiveResourceUi, 0);
+        int receiveBank = bankTradeBankResources.getOrDefault(selectedBankReceiveResourceUi, 0);
 
         addResourceAmount(activePlayerIndex, give, givePlayer - getResourceAmount(activePlayerIndex, give));
         addBankResourceAmount(give, giveBank - getBankResourceAmount(give));
@@ -3301,6 +3360,28 @@ public class GameRevisionView implements GameViewCallback {
             case ORE -> "Ore";
             case BRICK -> "Brick";
         };
+    }
+
+    private TradeResource toTradeResource(ResourceTypeUI resourceTypeUI) {
+        if (resourceTypeUI == null) return null;
+        return switch (resourceTypeUI) {
+            case BANANA -> TradeResource.BANANA;
+            case WOOD -> TradeResource.WOOD;
+            case WHEAT -> TradeResource.WHEAT;
+            case ORE -> TradeResource.ORE;
+            case BRICK -> TradeResource.BRICK;
+        };
+    }
+
+    private EnumMap<TradeResource, Integer> toTradeResourceMap(EnumMap<ResourceTypeUI, Integer> source) {
+        EnumMap<TradeResource, Integer> result = new EnumMap<>(TradeResource.class);
+        for (Map.Entry<ResourceTypeUI, Integer> entry : source.entrySet()) {
+            TradeResource resource = toTradeResource(entry.getKey());
+            if (resource != null) {
+                result.put(resource, entry.getValue());
+            }
+        }
+        return result;
     }
 
     @FXML
@@ -3371,16 +3452,16 @@ public class GameRevisionView implements GameViewCallback {
                 return;
             }
             syncAllPlayerStocksFromEngine();
-            initializeBankTradeDummyData();
+            initializeBankTradeResourceSnapshot();
         } else {
-            dummyPlayerResources.put(selectedPlayerGiveResourceUi,
-                    dummyPlayerResources.getOrDefault(selectedPlayerGiveResourceUi, 0) - 4);
-            dummyBankResources.put(selectedPlayerGiveResourceUi,
-                    dummyBankResources.getOrDefault(selectedPlayerGiveResourceUi, 0) + 4);
-            dummyBankResources.put(selectedBankReceiveResourceUi,
-                    dummyBankResources.getOrDefault(selectedBankReceiveResourceUi, 0) - 1);
-            dummyPlayerResources.put(selectedBankReceiveResourceUi,
-                    dummyPlayerResources.getOrDefault(selectedBankReceiveResourceUi, 0) + 1);
+            bankTradePlayerResources.put(selectedPlayerGiveResourceUi,
+                    bankTradePlayerResources.getOrDefault(selectedPlayerGiveResourceUi, 0) - 4);
+            bankTradeBankResources.put(selectedPlayerGiveResourceUi,
+                    bankTradeBankResources.getOrDefault(selectedPlayerGiveResourceUi, 0) + 4);
+            bankTradeBankResources.put(selectedBankReceiveResourceUi,
+                    bankTradeBankResources.getOrDefault(selectedBankReceiveResourceUi, 0) - 1);
+            bankTradePlayerResources.put(selectedBankReceiveResourceUi,
+                    bankTradePlayerResources.getOrDefault(selectedBankReceiveResourceUi, 0) + 1);
             applyBankTradeToMainStocks();
         }
         refreshInventoryForPlayerIndex(activePlayerIndex);
@@ -3411,10 +3492,38 @@ public class GameRevisionView implements GameViewCallback {
                 && getBankResourceAmount(receive) >= 1;
     }
 
-    private Set<TradeHarborType> getAccessibleHarborsForPlayer(int playerIndex) {
+    private Set<HarborType> getAccessibleHarborsForPlayer(int playerIndex) {
+        if (gameController != null) {
+            Board board = gameController.getBoard();
+            List<Player> players = gameController.getAllPlayers();
+            if (board != null && playerIndex >= 0 && playerIndex < players.size()) {
+                Player player = players.get(playerIndex);
+                Set<Integer> ownedIntersections = new HashSet<>();
+                for (Intersection inter : board.getAllIntersections()) {
+                    inter.getBuilding().ifPresent(building -> {
+                        if (building.getOwnerName().equals(player.getName())) {
+                            ownedIntersections.add(inter.getId());
+                        }
+                    });
+                }
+                Set<HarborType> accessible = new HashSet<>();
+                for (Harbor harbor : board.getAllHarbors()) {
+                    if (ownedIntersections.contains(harbor.getIntersectionIdA())
+                            || ownedIntersections.contains(harbor.getIntersectionIdB())) {
+                        HarborType harborType = parseHarborType(harbor.getType().name());
+                        if (harborType != null) {
+                            accessible.add(harborType);
+                        }
+                    }
+                }
+                return accessible;
+            }
+        }
+
         SaveData saveData = GameSession.getLoadedSaveData();
-        if (saveData == null || saveData.harbors == null || saveData.players == null || playerIndex >= saveData.players.size()) {
-            return new HashSet<>(Set.of(TradeHarborType.GENERAL, TradeHarborType.BANANA, TradeHarborType.WOOD));
+        if (saveData == null || saveData.harbors == null || saveData.players == null
+                || playerIndex >= saveData.players.size()) {
+            return Collections.emptySet();
         }
 
         SaveData.PlayerData playerData = saveData.players.get(playerIndex);
@@ -3427,41 +3536,36 @@ public class GameRevisionView implements GameViewCallback {
             ownedIntersections.add(buildingData.intersectionId);
         }
 
-        Set<TradeHarborType> accessible = new HashSet<>();
+        Set<HarborType> accessible = new HashSet<>();
         for (SaveData.HarborData harborData : saveData.harbors) {
             if (ownedIntersections.contains(harborData.intersectionIdA)
                     || ownedIntersections.contains(harborData.intersectionIdB)) {
-                TradeHarborType harborType = parseHarborType(harborData.harborType);
+                HarborType harborType = parseHarborType(harborData.harborType);
                 if (harborType != null) {
                     accessible.add(harborType);
                 }
             }
         }
-        if (accessible.isEmpty()) {
-            accessible.add(TradeHarborType.GENERAL);
-            accessible.add(TradeHarborType.BANANA);
-            accessible.add(TradeHarborType.WOOD);
-        }
         return accessible;
     }
 
-    private TradeHarborType parseHarborType(String rawHarborType) {
+    private HarborType parseHarborType(String rawHarborType) {
         if (rawHarborType == null) {
             return null;
         }
         String normalized = rawHarborType.trim().toUpperCase(Locale.ROOT);
         if (normalized.contains("THREE") || normalized.contains("GENERAL")) {
-            return TradeHarborType.GENERAL;
+            return HarborType.GENERAL;
         }
-        if (normalized.contains("BANANA")) return TradeHarborType.BANANA;
-        if (normalized.contains("WOOD")) return TradeHarborType.WOOD;
-        if (normalized.contains("BRICK")) return TradeHarborType.BRICK;
-        if (normalized.contains("WHEAT")) return TradeHarborType.WHEAT;
-        if (normalized.contains("ORE")) return TradeHarborType.ORE;
+        if (normalized.contains("BANANA")) return HarborType.BANANA;
+        if (normalized.contains("WOOD")) return HarborType.WOOD;
+        if (normalized.contains("BRICK")) return HarborType.BRICK;
+        if (normalized.contains("WHEAT")) return HarborType.WHEAT;
+        if (normalized.contains("ORE")) return HarborType.ORE;
         return null;
     }
 
-    private ResourceType getSpecialHarborResource(TradeHarborType harborType) {
+    private ResourceType getSpecialHarborResource(HarborType harborType) {
         return switch (harborType) {
             case BANANA -> ResourceType.BANANA;
             case WOOD -> ResourceType.WOOD;
@@ -3472,7 +3576,7 @@ public class GameRevisionView implements GameViewCallback {
         };
     }
 
-    private String getHarborButtonAssetName(TradeHarborType harborType) {
+    private String getHarborButtonAssetName(HarborType harborType) {
         return switch (harborType) {
             case GENERAL -> "harborGeneralButton.png";
             case BANANA -> "harborBananaButton.png";
@@ -3532,13 +3636,13 @@ public class GameRevisionView implements GameViewCallback {
         selectedHarborReceiveResource = null;
     }
 
-    private int getHarborRequiredAmount(TradeHarborType harborType) {
-        return harborType == TradeHarborType.GENERAL ? 3 : 2;
+    private int getHarborRequiredAmount(HarborType harborType) {
+        return harborType == HarborType.GENERAL ? 3 : 2;
     }
 
     private boolean isHarborGiveResourceEnabled(ResourceType resourceType) {
         if (selectedHarborType == null) return false;
-        if (selectedHarborType == TradeHarborType.GENERAL) return true;
+        if (selectedHarborType == HarborType.GENERAL) return true;
         ResourceType specialResource = getSpecialHarborResource(selectedHarborType);
         return specialResource == resourceType;
     }
@@ -3550,17 +3654,17 @@ public class GameRevisionView implements GameViewCallback {
     }
 
     private void updateHarborButtons(double scaleX, double scaleY) {
-        TradeHarborType[] order = {
-                TradeHarborType.GENERAL,
-                TradeHarborType.BANANA,
-                TradeHarborType.WOOD,
-                TradeHarborType.WHEAT,
-                TradeHarborType.ORE,
-                TradeHarborType.BRICK
+        HarborType[] order = {
+                HarborType.GENERAL,
+                HarborType.BANANA,
+                HarborType.WOOD,
+                HarborType.WHEAT,
+                HarborType.ORE,
+                HarborType.BRICK
         };
 
         for (int i = 0; i < order.length; i++) {
-            TradeHarborType harborType = order[i];
+            HarborType harborType = order[i];
             boolean available = availableHarbors.contains(harborType);
             boolean selected = selectedHarborType == harborType;
 
@@ -3599,7 +3703,7 @@ public class GameRevisionView implements GameViewCallback {
             button.setPrefHeight(h);
             button.setDisable(!available);
             button.setMouseTransparent(!available);
-            final TradeHarborType selectedType = harborType;
+            final HarborType selectedType = harborType;
             button.setOnAction(e -> selectHarbor(selectedType));
             tradeUiPane.getChildren().add(button);
         }
@@ -3780,7 +3884,7 @@ public class GameRevisionView implements GameViewCallback {
         tradeErrorLabel.setPrefHeight(HARBOR_MESSAGE_H * scaleY);
     }
 
-    private void selectHarbor(TradeHarborType harborType) {
+    private void selectHarbor(HarborType harborType) {
         if (!availableHarbors.contains(harborType)) {
             showHarborTradeMessage("You do not have access to this harbor.", false);
             return;
@@ -3817,38 +3921,20 @@ public class GameRevisionView implements GameViewCallback {
     }
 
     private String validateHarborTrade() {
-        if (selectedHarborType == null) {
-            return "Please select a harbor.";
-        }
-        if (!availableHarbors.contains(selectedHarborType)) {
-            return "You do not have access to this harbor.";
-        }
-        if (selectedHarborGiveResource == null) {
-            return "Please select a resource to give.";
-        }
-        if (selectedHarborReceiveResource == null) {
-            return "Please select a resource to receive.";
-        }
-        if (selectedHarborGiveResource == selectedHarborReceiveResource) {
-            return "You cannot trade the same resource.";
-        }
+        int playerGiveAmount = selectedHarborGiveResource == null
+                ? 0
+                : getResourceAmount(activePlayerIndex, selectedHarborGiveResource);
+        int bankReceiveAmount = selectedHarborReceiveResource == null
+                ? 0
+                : getBankResourceAmount(selectedHarborReceiveResource);
 
-        ResourceType specialResource = getSpecialHarborResource(selectedHarborType);
-        if (specialResource != null && selectedHarborGiveResource != specialResource) {
-            return "This harbor only accepts " + displayResource(specialResource) + ".";
-        }
-
-        int requiredAmount = getHarborRequiredAmount(selectedHarborType);
-        int playerHave = getResourceAmount(activePlayerIndex, selectedHarborGiveResource);
-        if (playerHave < requiredAmount) {
-            String resourceName = displayResource(selectedHarborGiveResource);
-            return "Not enough " + resourceName + ". You need " + requiredAmount + " " + resourceName + ".";
-        }
-
-        if (getBankResourceAmount(selectedHarborReceiveResource) < 1) {
-            return "Bank does not have enough " + displayResource(selectedHarborReceiveResource) + ".";
-        }
-        return null;
+        return harborTradeService.validate(
+                selectedHarborType,
+                availableHarbors,
+                TradeResource.fromModel(selectedHarborGiveResource),
+                TradeResource.fromModel(selectedHarborReceiveResource),
+                playerGiveAmount,
+                bankReceiveAmount);
     }
 
     private void showHarborTradeMessage(String message, boolean success) {
@@ -3896,7 +3982,7 @@ public class GameRevisionView implements GameViewCallback {
                 return;
             }
             syncAllPlayerStocksFromEngine();
-            initializeBankTradeDummyData();
+            initializeBankTradeResourceSnapshot();
             refreshInventoryForPlayerIndex(activePlayerIndex);
         } else {
             addResourceAmount(activePlayerIndex, give, -requiredAmount);
@@ -3924,7 +4010,7 @@ public class GameRevisionView implements GameViewCallback {
         showTradeChoice();
     }
 
-    private void executeOffer(TradeOfferState offer) {
+    private void executeOffer(TradeOffer offer) {
         if (gameController != null) {
             // Update engine player objects directly; sync local stocks from engine afterward
             List<model.player.Player> allPlayers = gameController.getAllPlayers();
@@ -3953,7 +4039,7 @@ public class GameRevisionView implements GameViewCallback {
                 }
             }
             syncAllPlayerStocksFromEngine();
-            initializeBankTradeDummyData();
+            initializeBankTradeResourceSnapshot();
             refreshInventoryForPlayerIndex(activePlayerIndex);
         } else {
             // No engine – update local stocks only
@@ -3989,7 +4075,15 @@ public class GameRevisionView implements GameViewCallback {
             if (remainingSeconds <= 0) {
                 stopTimer();
                 appendLog("⏱ Waktu habis — giliran berakhir otomatis.");
-                performEndTurn();
+                if (gameController != null) {
+                    try {
+                        gameController.endTurn();
+                    } catch (Exception | AssertionError ex) {
+                        performEndTurn();
+                    }
+                } else {
+                    performEndTurn();
+                }
             }
         }));
         timerTimeline.setCycleCount(Timeline.INDEFINITE);
@@ -4394,8 +4488,18 @@ public class GameRevisionView implements GameViewCallback {
 
         if (gameController != null) {
             // ── Pakai BuildValidator via bridge — validasi nyata dari engine ──
-            // Distance rule, connectivity, lab-hanya-dari-outpost, resource check
             TurnPhase phase = gameController.getCurrentPhase();
+
+            // Road Building card played before rolling dice: show pipes only
+            if (phase == TurnPhase.ROLL_DICE && gameController.getFreeRoadsRemaining() > 0) {
+                Player activePlayer = gameController.getActivePlayer();
+                Set<Integer> freePipeIds = gameController.getValidPipeIds(activePlayer);
+                appendLog("[Build] pipe=" + freePipeIds.size() + " (Road Building pre-roll)");
+                enterBuildMode(java.util.Collections.emptySet(), java.util.Collections.emptySet(),
+                        freePipeIds, currentBoard);
+                return;
+            }
+
             if (phase != TurnPhase.TRADE_BUILD
                 && phase != TurnPhase.SETUP_PLACE_FIRST
                 && phase != TurnPhase.SETUP_PLACE_SECOND) return;
@@ -4681,10 +4785,9 @@ public class GameRevisionView implements GameViewCallback {
         SaveData saveData = GameSession.getLoadedSaveData();
         if (saveData == null || saveData.players == null) return;
 
-        String[] colorNames = {"red", "blue", "green", "yellow"};
         for (int i = 0; i < saveData.players.size(); i++) {
             SaveData.PlayerData pd = saveData.players.get(i);
-            String colorName = colorNames[i % colorNames.length];
+            String colorName = (pd.color != null) ? pd.color.toLowerCase() : getPlayerColorName(i);
 
             // Render bangunan (outpost / lab)
             if (pd.buildings != null) {
@@ -4707,6 +4810,7 @@ public class GameRevisionView implements GameViewCallback {
 
     private static final String BUILT_TAG = "built-structure";
     private static final double PIPE_THICKNESS = 14.0;
+    private static final double PIPE_OUTLINE_EXTRA = 4.0;
 
     private void renderBuildingOnMap(int intersectionId, String type, String colorName) {
         if (currentBoard == null) return;
@@ -4747,6 +4851,18 @@ public class GameRevisionView implements GameViewCallback {
         double cx = (a.x() + b.x()) / 2.0;
         double cy = (a.y() + b.y()) / 2.0;
 
+        double outlineThickness = PIPE_THICKNESS + PIPE_OUTLINE_EXTRA;
+        double outlineLength = len + PIPE_OUTLINE_EXTRA;
+
+        javafx.scene.shape.Rectangle pipeOutline = new javafx.scene.shape.Rectangle(outlineLength, outlineThickness);
+        pipeOutline.setFill(javafx.scene.paint.Color.BLACK);
+        pipeOutline.setArcWidth(outlineThickness);
+        pipeOutline.setArcHeight(outlineThickness);
+        pipeOutline.setLayoutX(cx - outlineLength / 2.0);
+        pipeOutline.setLayoutY(cy - outlineThickness / 2.0);
+        pipeOutline.setRotate(angle);
+        pipeOutline.setUserData(BUILT_TAG);
+
         javafx.scene.shape.Rectangle pipe = new javafx.scene.shape.Rectangle(len, PIPE_THICKNESS);
         pipe.setFill(getPlayerJavafxColor(playerIdx));
         pipe.setArcWidth(PIPE_THICKNESS);
@@ -4755,6 +4871,7 @@ public class GameRevisionView implements GameViewCallback {
         pipe.setLayoutY(cy - PIPE_THICKNESS / 2.0);
         pipe.setRotate(angle);
         pipe.setUserData(BUILT_TAG);
+        pipeLayer.getChildren().add(pipeOutline);
         pipeLayer.getChildren().add(pipe); // middle layer → above circles, below buildings
     }
 
@@ -5129,6 +5246,11 @@ public class GameRevisionView implements GameViewCallback {
                 clearDiceDisplay();
                 exitBuildMode();
                 exitRobberMoveMode();
+                if (gameController != null) {
+                    activePlayerIndex = gameController.getCurrentPlayerIdx();
+                    refreshInventoryForPlayerIndex(activePlayerIndex);
+                    refreshPlayerStatsAll();
+                }
                 if (previousPhase == TurnPhase.SETUP_PLACE_SECOND) {
                     appendLog("Initial setup complete. Normal turns begin.");
                     if (gameController != null) {
@@ -5141,7 +5263,11 @@ public class GameRevisionView implements GameViewCallback {
                 stopAutoRollCountdown(); // dice sudah dilempar, batalkan auto-roll
                 exitRobberMoveMode();
                 tryAutoEnterBuildMode();
-                // Timer TIDAK di-restart di sini — sudah berjalan sejak ROLL_DICE
+                // Timer sudah berjalan sejak ROLL_DICE untuk kasus normal.
+                // Jika dice=7, timer dihentikan di ROBBER_DISCARD — restart di sini.
+                if (timerTimeline == null) {
+                    startTurnTimer(DEFAULT_TURN_SECONDS);
+                }
             }
             case ROBBER_DISCARD -> {
                 stopTimer();
@@ -5150,6 +5276,7 @@ public class GameRevisionView implements GameViewCallback {
             }
             case ROBBER_MOVE -> {
                 stopAutoRollCountdown();
+                exitBuildMode();
                 appendLog("Move Nimon Ungu to another tile.");
                 showCenteredWarning("Click a tile to place Nimon Ungu!", 4000, "#8B4513");
                 enterRobberMoveMode();
@@ -5157,8 +5284,8 @@ public class GameRevisionView implements GameViewCallback {
             case GAME_OVER -> {
                 stopTimer();
                 stopAutoRollCountdown();
-                if (declareVictoryOverlayController != null) {
-                    declareVictoryOverlayController.showDeclareVictoryScreen();
+                if (!victoryDeclarationConfirmed) {
+                    showDeclareVictoryConfirmationPopup(activePlayerIndex);
                 }
             }
             case SETUP_PLACE_FIRST -> {
@@ -5210,7 +5337,8 @@ public class GameRevisionView implements GameViewCallback {
             useCardOverlayManager.hideUseCardPopup();
         }
         refreshInventoryForPlayerIndex(activePlayerIndex);
-        initializeBankTradeDummyData();
+        refreshPlayerStatsAll();
+        initializeBankTradeResourceSnapshot();
         appendLog("─── Giliran " + newActivePlayer.getName() + " ───");
     }
 
@@ -5224,6 +5352,8 @@ public class GameRevisionView implements GameViewCallback {
         if (gameController != null) {
             syncAllPlayerStocksFromEngine();
             refreshInventoryForPlayerIndex(activePlayerIndex);
+            refreshBankPanel(gameController.getBank());
+            initializeBankTradeResourceSnapshot();
         }
         appendLog(player.getName() + " built " + buildingType + ".");
         if (gameController != null && isInitialSetupPhase() && !"lab".equals(type)) {
@@ -5236,10 +5366,14 @@ public class GameRevisionView implements GameViewCallback {
     public void onPipePlaced(Player player, int pathId) {
         renderPipeOnMap(pathId, getAllPlayerIndex(player));
         refreshPlayerStatsAll();
-        // Sync inventory — resources sudah terpotong oleh engine
         if (gameController != null) {
             syncAllPlayerStocksFromEngine();
             refreshInventoryForPlayerIndex(activePlayerIndex);
+            refreshBankPanel(gameController.getBank());
+            initializeBankTradeResourceSnapshot();
+            if (gameController.getFreeRoadsRemaining() > 0) {
+                tryAutoEnterBuildMode();
+            }
         }
         appendLog("🛣 " + player.getName() + " membangun pipe");
     }
@@ -5250,7 +5384,7 @@ public class GameRevisionView implements GameViewCallback {
             syncAllPlayerStocksFromEngine();
             refreshInventoryForPlayerIndex(activePlayerIndex);
             refreshBankPanel(gameController.getBank());
-            initializeBankTradeDummyData();
+            initializeBankTradeResourceSnapshot();
         }
     }
 
@@ -5338,15 +5472,6 @@ public class GameRevisionView implements GameViewCallback {
         confirmBtn.setDisable(hasCandidates); // disabled sampai player dipilih
         confirmBtn.getStyleClass().add("transparent-click-zone");
 
-        // Overlay semi-transparan di atas tombol CONFIRM saat belum bisa dipencet
-        // Gunakan rectangle visual untuk menunjukkan state disabled
-        javafx.scene.shape.Rectangle confirmBlocker = new javafx.scene.shape.Rectangle(
-            802, 643, 215, 70);
-        confirmBlocker.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, hasCandidates ? 0.4 : 0.0));
-        confirmBlocker.setMouseTransparent(true);
-        confirmBlocker.setUserData("confirm-blocker");
-        popup.getChildren().add(confirmBlocker);
-
         for (int i = 0; i < allPlayers.size(); i++) {
             model.player.Player p = allPlayers.get(i);
             boolean isActive    = (gameController != null
@@ -5386,7 +5511,6 @@ public class GameRevisionView implements GameViewCallback {
                     selected[0] = pFinal;
                     // Aktifkan CONFIRM setelah pemain dipilih
                     confirmBtn.setDisable(false);
-                    confirmBlocker.setFill(javafx.scene.paint.Color.TRANSPARENT);
                     // Update highlight kartu
                     for (VBox cv : cardViews) {
                         String cName = (String) cv.getUserData();
@@ -5441,7 +5565,7 @@ public class GameRevisionView implements GameViewCallback {
             syncAllPlayerStocksFromEngine();
             refreshInventoryForPlayerIndex(activePlayerIndex);
             refreshBankPanel(gameController.getBank());
-            initializeBankTradeDummyData();
+            initializeBankTradeResourceSnapshot();
         }
         appendLog("🗑 " + player.getName() + " membuang kartu resource.");
     }
@@ -5453,7 +5577,7 @@ public class GameRevisionView implements GameViewCallback {
         if (gameController != null) {
             syncAllPlayerStocksFromEngine();
             refreshInventoryForPlayerIndex(activePlayerIndex);
-            initializeBankTradeDummyData();
+            initializeBankTradeResourceSnapshot();
         }
     }
 
@@ -5500,24 +5624,21 @@ public class GameRevisionView implements GameViewCallback {
 
     @Override
     public void onTimerTick(int secondsRemaining) {
-        // Engine timer mengoverride UI timer jika terhubung
-        remainingSeconds = secondsRemaining;
-        updateTimerDisplay();
+        // UI timer (dimulai sejak ROLL_DICE) yang mengelola tampilan.
+        // Engine timer baru mulai setelah TRADE_BUILD (sesudah dice diroll),
+        // sehingga nilainya lebih besar dan akan menyebabkan timer "reset" jika dipakai.
+        // Abaikan — engine tetap menangani onTimerExpired saat waktu habis.
     }
 
     @Override
     public void onTimerExpired(Player playerWhoTimedOut) {
         appendLog("⏱ Waktu habis untuk " + playerWhoTimedOut.getName());
-        performEndTurn();
     }
 
     @Override
     public void onGameWon(Player winner) {
-        stopTimer();
         appendLog("🏆 " + winner.getName() + " MENANG!");
-        if (declareVictoryOverlayController != null) {
-            declareVictoryOverlayController.showDeclareVictoryScreen();
-        }
+        showDeclareVictoryConfirmationPopup(getAllPlayerIndex(winner));
     }
 
     // ── Helpers untuk GameUICallback ─────────────────────────────────
@@ -5555,14 +5676,14 @@ public class GameRevisionView implements GameViewCallback {
         int limit = Math.min(players.size(), 4);
         for (int i = 0; i < limit; i++) {
             model.player.Player p = players.get(i);
-            int outposts = 0, labs = 0, pipes = 0;
+            int outposts = 0, labs = 0, pipes = 0, knight = 0;
             if (p instanceof model.player.HumanPlayer hp) {
                 outposts = model.player.HumanPlayer.MAX_SETTLEMENTS - hp.getSettlementsInSupply();
                 labs     = model.player.HumanPlayer.MAX_LABORATORIES - hp.getLaboratoriesInSupply();
-                pipes    = model.player.HumanPlayer.MAX_PIPES - hp.getPipesInSupply();
+                pipes    = gameController.computeLongestRoad(p);
+                knight   = hp.getInventory().getKnightCardsPlayed();
             }
-            int vp     = gameController.computeVictoryPoints(p);
-            int knight = countCards(p, model.card.CardCategory.KNIGHT);
+            int vp = gameController.computeVictoryPoints(p);
             Label[] row = statLabels[i];
             if (row[0] != null) row[0].setText(String.valueOf(vp));
             if (row[1] != null) row[1].setText(String.valueOf(outposts));
@@ -5570,10 +5691,10 @@ public class GameRevisionView implements GameViewCallback {
             if (row[3] != null) row[3].setText(String.valueOf(knight));
             if (row[4] != null) row[4].setText(String.valueOf(pipes));
             playerVictoryPointsCache[i] = vp;
-            refreshPlayerStatusCards(i + 1,
-                countCards(p, model.card.CardCategory.KNIGHT),
-                countCards(p, model.card.CardCategory.PROGRESS),
-                countCards(p, model.card.CardCategory.VICTORY_POINT));
+            java.util.Collection<model.player.SpecialCard> specials = (p instanceof model.player.HumanPlayer hpSc)
+                ? hpSc.getHeldSpecialCards()
+                : java.util.Collections.emptySet();
+            refreshPlayerStatusCards(i + 1, specials);
         }
     }
 
@@ -5907,7 +6028,7 @@ public class GameRevisionView implements GameViewCallback {
         // Always sync latest resource counts before showing trade UI
         if (gameController != null) {
             syncAllPlayerStocksFromEngine();
-            initializeBankTradeDummyData();
+            initializeBankTradeResourceSnapshot();
         }
         currentProposerIndex = Math.max(0, Math.min(activePlayerIndex, Math.max(playerResourceStocks.size() - 1, 0)));
         currentReceiverIndex = playerResourceStocks.size() > 1
@@ -5916,7 +6037,7 @@ public class GameRevisionView implements GameViewCallback {
         selectedTargetIndex = -1;
         resetTradeDraftQuantities();
         clearTradeError();
-        showTradeChoice();
+        tradeOverlayManager.showTradeChoice();
         appendLog("Trade menu opened.");
     }
 
@@ -5925,11 +6046,8 @@ public class GameRevisionView implements GameViewCallback {
         System.out.println("[TradeUI] Trade choice -> BANK");
         selectedBankReceiveResourceUi = null;
         selectedPlayerGiveResourceUi = null;
-        initializeBankTradeDummyData();
-        selectedBankGiveResource = null;
-        selectedBankReceiveResource = null;
-        showBankTrade();
-        appendLog("Bank trade selected.");
+        initializeBankTradeResourceSnapshot();
+        tradeOverlayManager.showBankTrade();
     }
 
     @FXML
@@ -5937,8 +6055,7 @@ public class GameRevisionView implements GameViewCallback {
         System.out.println("[TradeUI] Trade choice -> PLAYER");
         selectedTargetIndex = -1;
         resetTradeDraftQuantities();
-        showPlayerTrade();
-        appendLog("Player trade selected.");
+        tradeOverlayManager.showPlayerTrade();
     }
 
     @FXML
@@ -5947,8 +6064,7 @@ public class GameRevisionView implements GameViewCallback {
         selectedHarborType = null;
         selectedHarborGiveResource = null;
         selectedHarborReceiveResource = null;
-        showHarborTrade();
-        appendLog("Harbor trade selected.");
+        tradeOverlayManager.showHarborTrade();
     }
     @FXML
     private void onBuyCardClicked()  {
@@ -5987,9 +6103,6 @@ public class GameRevisionView implements GameViewCallback {
     }
     @FXML
     private void onDeclareVictoryClicked() {
-        if (!requireDiceRolled()) return;
-
-        // Cek VP dari engine jika tersedia, fallback ke local cache
         int vp = (gameController != null)
             ? gameController.computeVictoryPoints(gameController.getActivePlayer())
             : currentPlayerVP();
@@ -5998,15 +6111,12 @@ public class GameRevisionView implements GameViewCallback {
             : VICTORY_THRESHOLD;
 
         if (vp < threshold) {
-            showCenteredWarning("Butuh " + threshold + " VP! (kamu: " + vp + " VP)", 2000);
+            showInformationPopup(
+                    "You cannot declare victory yet. You need " + threshold + " Victory Points.",
+                    InformationCloseAction.RETURN_TO_GAME);
             return;
         }
-        if (declareVictoryOverlayController == null) {
-            showInformationPopup("Declare Victory screen is not available.",
-                InformationCloseAction.RETURN_TO_GAME);
-            return;
-        }
-        declareVictoryOverlayController.showDeclareVictoryScreen();
+        showDeclareVictoryConfirmationPopup(activePlayerIndex);
     }
 
     @FXML
@@ -6031,7 +6141,8 @@ public class GameRevisionView implements GameViewCallback {
 
     @FXML
     private void onSaveClicked() {
-        showSavePluginDialog();
+        // Langsung buka file explorer tanpa popup perantara
+        performSaveGame();
     }
 
     private void showSavePluginDialog() {
@@ -6197,3 +6308,4 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 }
+
