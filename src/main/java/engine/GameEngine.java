@@ -273,9 +273,7 @@ public class GameEngine {
         if (card instanceof VictoryPointCard) {
             int vp = victoryManager.computeVictoryPoints(player, state.getBoard());
             if (vp >= victoryManager.getVictoryThreshold()) {
-                state.setWinner(player);
                 notifyListeners(l -> l.onGameWon(player));
-                return card;
             }
         }
 
@@ -490,11 +488,25 @@ public class GameEngine {
         if (state.isGameOver()) return;
         if (state.getCurrentPhase() != TurnPhase.TRADE_BUILD) return;
 
-        victoryManager.checkWinner(state).ifPresent(winner -> {
-            state.setWinner(winner);
-            turnTimer.stop();
-            notifyListeners(l -> l.onGameWon(winner));
-        });
+        victoryManager.checkWinner(state).ifPresent(winner ->
+                notifyListeners(l -> l.onGameWon(winner)));
+    }
+
+    public void confirmVictory(Player winner) {
+        if (winner == null) {
+            throw new IllegalArgumentException("Winning player must not be null.");
+        }
+        if (state.isGameOver()) {
+            return;
+        }
+        if (!victoryManager.hasWon(winner, state.getBoard())) {
+            throw new IllegalStateException(
+                    winner.getName() + " does not have enough victory points.");
+        }
+
+        state.setWinner(winner);
+        turnTimer.stop();
+        notifyListeners(l -> l.onPhaseChanged(TurnPhase.GAME_OVER));
     }
 
     private void payBuildCost(Player player, model.building.BuildCost cost) {

@@ -413,6 +413,9 @@ public class GameRevisionView implements GameViewCallback {
     private static final String TRADE_COUNTER_IMAGE_PATH = "/com/bananarepublic/images/trade/Counter Offer.png";
     private static final String TRADE_REVIEW_COUNTER_IMAGE_PATH = "/com/bananarepublic/images/trade/Review Counter.png";
     private static final String TRADE_INFORMATION_IMAGE_PATH = "/com/bananarepublic/images/trade/information.png";
+    private static final String DECLARE_VICTORY_CONFIRMATION_IMAGE_PATH = "/com/bananarepublic/images/trade/Declare Victory.png";
+    private static final String VICTORY_CONFIRM_BUTTON_IMAGE_PATH = "/com/bananarepublic/images/trade/btn_confirm.png";
+    private static final String VICTORY_CANCEL_BUTTON_IMAGE_PATH = "/com/bananarepublic/images/trade/btn_cancel.png";
     private static final String PLAYER_PROFILE_BASE_PATH = "/com/bananarepublic/images/trade/profilepictPlayer%d.png";
     private static final double TRADE_OFFER_ASSET_WIDTH = 926.0;
     private static final double TRADE_OFFER_ASSET_HEIGHT = 1124.0;
@@ -486,6 +489,9 @@ public class GameRevisionView implements GameViewCallback {
     private final PlayerTradeService playerTradeService = new PlayerTradeService();
     private TradeOverlayManager tradeOverlayManager;
     private InformationCloseAction informationCloseAction = InformationCloseAction.RETURN_TO_GAME;
+    private int pendingVictoryPlayerIndex = -1;
+    private boolean victoryConfirmationVisible;
+    private boolean victoryDeclarationConfirmed;
     private double currentPopupLogicalWidth = POPUP_ASSET_WIDTH;
     private double currentPopupLogicalHeight = POPUP_ASSET_HEIGHT;
 
@@ -784,7 +790,7 @@ public class GameRevisionView implements GameViewCallback {
     private void setupDeclareVictoryOverlay() {
         if (declareVictoryOverlayController == null) return;
         declareVictoryOverlayController.configure(
-                () -> activePlayerIndex,
+                () -> pendingVictoryPlayerIndex >= 0 ? pendingVictoryPlayerIndex : activePlayerIndex,
                 this::buildVictoryLeaderboardEntries,
                 message -> showInformationPopup(message, InformationCloseAction.RETURN_TO_GAME),
                 () -> {
@@ -798,9 +804,16 @@ public class GameRevisionView implements GameViewCallback {
         );
     }
 
-    private boolean saveGameFromVictoryOverlay() {
-        // TODO: connect to real persistence save service.
-        return true;
+    private boolean saveGameFromVictoryOverlay(java.io.File file) {
+        if (gameController == null || file == null) {
+            return false;
+        }
+
+        boolean success = gameController.saveGame(file);
+        if (success) {
+            appendLog("Game saved: " + file.getName());
+        }
+        return success;
     }
 
     private List<DeclareVictoryOverlay.VictoryLeaderboardEntry> buildVictoryLeaderboardEntries() {
@@ -1587,6 +1600,141 @@ public class GameRevisionView implements GameViewCallback {
 
         tradeUiPane.getChildren().addAll(messageLabel, closeButton);
         tradeUiPane.toFront();
+    }
+
+    private void showDeclareVictoryConfirmationPopup(int playerIndex) {
+        if (victoryConfirmationVisible) {
+            return;
+        }
+        if (declareVictoryOverlayController == null) {
+            showInformationPopup("Declare Victory screen is not available.",
+                    InformationCloseAction.RETURN_TO_GAME);
+            return;
+        }
+
+        pendingVictoryPlayerIndex = Math.max(0, playerIndex);
+        victoryConfirmationVisible = true;
+
+        hideAllTradeControls();
+        currentTradeMode = TradeMode.INFORMATION;
+        informationCloseAction = InformationCloseAction.RETURN_TO_GAME;
+
+        showPopupImage(DECLARE_VICTORY_CONFIRMATION_IMAGE_PATH);
+        setTradeOverlayContentVisible(true);
+        tradeUiPane.getChildren().clear();
+        hideTradeActions();
+        setBankTradeActionButtonsVisible(false);
+        clearPlayerTradeMessage();
+        clearTradeError();
+
+        popupCloseButton.setVisible(false);
+        popupCloseButton.setManaged(false);
+        popupCloseButton.setDisable(true);
+        popupCloseButton.setMouseTransparent(true);
+
+        Label messageLabel = new Label("Do you want to declare your victory?");
+        messageLabel.getStyleClass().add("trade-info-message-label");
+        messageLabel.setWrapText(true);
+        messageLabel.setAlignment(Pos.CENTER);
+        messageLabel.setPrefWidth(currentPopupLogicalWidth * 0.72);
+        messageLabel.setPrefHeight(currentPopupLogicalHeight * 0.20);
+        messageLabel.setLayoutX((currentPopupLogicalWidth - messageLabel.getPrefWidth()) / 2.0);
+        messageLabel.setLayoutY(currentPopupLogicalHeight * 0.43);
+
+        double buttonWidth = Math.min(205.0, currentPopupLogicalWidth * 0.32);
+        double buttonHeight = buttonWidth * 0.30;
+        double buttonGap = currentPopupLogicalWidth * 0.035;
+        double buttonsWidth = buttonWidth * 2.0 + buttonGap;
+        double buttonY = currentPopupLogicalHeight - buttonHeight - currentPopupLogicalHeight * 0.10;
+        double cancelX = (currentPopupLogicalWidth - buttonsWidth) / 2.0;
+        double confirmX = cancelX + buttonWidth + buttonGap;
+
+        ImageView cancelImage = createVictoryConfirmationButtonImage(
+                VICTORY_CANCEL_BUTTON_IMAGE_PATH, cancelX, buttonY, buttonWidth, buttonHeight);
+        ImageView confirmImage = createVictoryConfirmationButtonImage(
+                VICTORY_CONFIRM_BUTTON_IMAGE_PATH, confirmX, buttonY, buttonWidth, buttonHeight);
+
+        Button cancelButton = createVictoryConfirmationHitbox(
+                cancelX, buttonY, buttonWidth, buttonHeight, this::cancelVictoryConfirmation);
+        Button confirmButton = createVictoryConfirmationHitbox(
+                confirmX, buttonY, buttonWidth, buttonHeight, this::confirmVictoryDeclaration);
+
+        tradeUiPane.getChildren().addAll(
+                messageLabel,
+                cancelImage,
+                confirmImage,
+                cancelButton,
+                confirmButton);
+        tradeUiPane.toFront();
+    }
+
+    private ImageView createVictoryConfirmationButtonImage(
+            String imagePath,
+            double x,
+            double y,
+            double width,
+            double height) {
+        ImageView imageView = new ImageView(new Image(getClass().getResource(imagePath).toExternalForm()));
+        imageView.setLayoutX(x);
+        imageView.setLayoutY(y);
+        imageView.setFitWidth(width);
+        imageView.setFitHeight(height);
+        imageView.setPreserveRatio(false);
+        imageView.setMouseTransparent(true);
+        return imageView;
+    }
+
+    private Button createVictoryConfirmationHitbox(
+            double x,
+            double y,
+            double width,
+            double height,
+            Runnable action) {
+        Button button = new Button();
+        button.getStyleClass().add("trade-click-zone");
+        button.setOpacity(0.0);
+        button.setLayoutX(x);
+        button.setLayoutY(y);
+        button.setPrefWidth(width);
+        button.setPrefHeight(height);
+        button.setOnAction(event -> action.run());
+        return button;
+    }
+
+    private void cancelVictoryConfirmation() {
+        pendingVictoryPlayerIndex = -1;
+        victoryConfirmationVisible = false;
+        hidePopup();
+    }
+
+    private void confirmVictoryDeclaration() {
+        int winnerIndex = pendingVictoryPlayerIndex;
+        victoryConfirmationVisible = false;
+        hidePopup();
+
+        try {
+            if (gameController != null) {
+                List<Player> players = gameController.getAllPlayers();
+                if (winnerIndex < 0 || winnerIndex >= players.size()) {
+                    throw new IllegalStateException("Winning player is unavailable.");
+                }
+                victoryDeclarationConfirmed = true;
+                gameController.confirmVictory(players.get(winnerIndex));
+            }
+
+            stopTimer();
+            stopAutoRollCountdown();
+            if (declareVictoryOverlayController != null) {
+                pendingVictoryPlayerIndex = winnerIndex;
+                declareVictoryOverlayController.showDeclareVictoryScreen();
+            }
+        } catch (Exception exception) {
+            victoryDeclarationConfirmed = false;
+            showInformationPopup("Failed to declare victory.",
+                    InformationCloseAction.RETURN_TO_GAME);
+        } finally {
+            pendingVictoryPlayerIndex = -1;
+        }
     }
 
     private void setBankTradeControlsVisible(boolean visible) {
@@ -5136,8 +5284,8 @@ public class GameRevisionView implements GameViewCallback {
             case GAME_OVER -> {
                 stopTimer();
                 stopAutoRollCountdown();
-                if (declareVictoryOverlayController != null) {
-                    declareVictoryOverlayController.showDeclareVictoryScreen();
+                if (!victoryDeclarationConfirmed) {
+                    showDeclareVictoryConfirmationPopup(activePlayerIndex);
                 }
             }
             case SETUP_PLACE_FIRST -> {
@@ -5489,11 +5637,8 @@ public class GameRevisionView implements GameViewCallback {
 
     @Override
     public void onGameWon(Player winner) {
-        stopTimer();
         appendLog("🏆 " + winner.getName() + " MENANG!");
-        if (declareVictoryOverlayController != null) {
-            declareVictoryOverlayController.showDeclareVictoryScreen();
-        }
+        showDeclareVictoryConfirmationPopup(getAllPlayerIndex(winner));
     }
 
     // ── Helpers untuk GameUICallback ─────────────────────────────────
@@ -5958,9 +6103,6 @@ public class GameRevisionView implements GameViewCallback {
     }
     @FXML
     private void onDeclareVictoryClicked() {
-        if (!requireDiceRolled()) return;
-
-        // Cek VP dari engine jika tersedia, fallback ke local cache
         int vp = (gameController != null)
             ? gameController.computeVictoryPoints(gameController.getActivePlayer())
             : currentPlayerVP();
@@ -5969,15 +6111,12 @@ public class GameRevisionView implements GameViewCallback {
             : VICTORY_THRESHOLD;
 
         if (vp < threshold) {
-            showCenteredWarning("Butuh " + threshold + " VP! (kamu: " + vp + " VP)", 2000);
+            showInformationPopup(
+                    "You cannot declare victory yet. You need " + threshold + " Victory Points.",
+                    InformationCloseAction.RETURN_TO_GAME);
             return;
         }
-        if (declareVictoryOverlayController == null) {
-            showInformationPopup("Declare Victory screen is not available.",
-                InformationCloseAction.RETURN_TO_GAME);
-            return;
-        }
-        declareVictoryOverlayController.showDeclareVictoryScreen();
+        showDeclareVictoryConfirmationPopup(activePlayerIndex);
     }
 
     @FXML
