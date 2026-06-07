@@ -1,0 +1,113 @@
+{
+  "version": "1.0.0",
+  "timestamp": "2026-06-06T00:00:00.000Z",
+  "currentPlayerIndex": 1,
+  "currentPhase": "ROLL_DICE",
+  "roundNumber": 4,
+  "timerSecondsRemaining": 0,
+  "robberQ": 0,
+  "robberR": 0,
+  "longestRoadHolder": null,
+  "largestArmyHolder": null,
+  "currentLongestRoadLength": 0,
+  "currentLargestArmySize": 0,
+  "deckKnightCount": 25,
+  "deckProgressCount": 25,
+  "deckVictoryPointCount": 25,
+  "deckCustomCount": 25,
+  "bank": {
+    "ORE": 16,
+    "WOOD": 16,
+    "BRICK": 16,
+    "WHEAT": 16,
+    "BANANA": 16
+  },
+  "mapConfig": [
+    {"q":1,"r":0,"terrainType":"FOREST","tokenNumber":5},
+    {"q":0,"r":-1,"terrainType":"FIELD","tokenNumber":6},
+    {"q":0,"r":0,"terrainType":"DESERT","tokenNumber":0},
+    {"q":-1,"r":-1,"terrainType":"FIELD","tokenNumber":10},
+    {"q":1,"r":1,"terrainType":"BANANA_GROVE","tokenNumber":11},
+    {"q":-1,"r":0,"terrainType":"MOUNTAIN","tokenNumber":3},
+    {"q":0,"r":1,"terrainType":"FOREST","tokenNumber":10},
+    {"q":-1,"r":1,"terrainType":"BANANA_GROVE","tokenNumber":8},
+    {"q":-2,"r":0,"terrainType":"BANANA_GROVE","tokenNumber":9},
+    {"q":0,"r":2,"terrainType":"MOUNTAIN","tokenNumber":3},
+    {"q":-2,"r":1,"terrainType":"FOREST","tokenNumber":4},
+    {"q":-1,"r":2,"terrainType":"FIELD","tokenNumber":6},
+    {"q":-2,"r":2,"terrainType":"HILL","tokenNumber":5},
+    {"q":2,"r":-2,"terrainType":"FOREST","tokenNumber":11},
+    {"q":2,"r":-1,"terrainType":"MOUNTAIN","tokenNumber":12},
+    {"q":1,"r":-2,"terrainType":"BANANA_GROVE","tokenNumber":4},
+    {"q":1,"r":-1,"terrainType":"HILL","tokenNumber":2},
+    {"q":2,"r":0,"terrainType":"FIELD","tokenNumber":9},
+    {"q":0,"r":-2,"terrainType":"HILL","tokenNumber":8}
+  ],
+  "harbors": [
+    {"harborType":"GENERAL","intersectionIdA":33,"intersectionIdB":32},
+    {"harborType":"WOOD","intersectionIdA":38,"intersectionIdB":37},
+    {"harborType":"BANANA","intersectionIdA":28,"intersectionIdB":25},
+    {"harborType":"GENERAL","intersectionIdA":40,"intersectionIdB":41},
+    {"harborType":"ORE","intersectionIdA":24,"intersectionIdB":27},
+    {"harborType":"GENERAL","intersectionIdA":43,"intersectionIdB":42},
+    {"harborType":"WHEAT","intersectionIdA":53,"intersectionIdB":26},
+    {"harborType":"BRICK","intersectionIdA":45,"intersectionIdB":46},
+    {"harborType":"GENERAL","intersectionIdA":51,"intersectionIdB":52}
+  ],
+  "players": [
+    {
+      "name": "Human",
+      "color": "YELLOW",
+      "isBot": false,
+      "botStrategyName": null,
+      "knightCardsInHand": 0,
+      "progressCardsInHand": 0,
+      "victoryPointCardsInHand": 0,
+      "customCardsInHand": 0,
+      "knightCardsPlayed": 0,
+      "resources": {"ORE":1,"WOOD":2,"BRICK":1,"WHEAT":2,"BANANA":1},
+      "buildings": [
+        {"intersectionId":5,"buildingType":"SETTLEMENT"},
+        {"intersectionId":19,"buildingType":"SETTLEMENT"}
+      ],
+      "pipePathIds": [3,4,18,22],
+      "heldSpecialCards": []
+    },
+    {
+      "name": "GreedyBot",
+      "color": "BLUE",
+      "isBot": true,
+      "botStrategyName": "GreedyBot",
+      "knightCardsInHand": 0,
+      "progressCardsInHand": 0,
+      "victoryPointCardsInHand": 0,
+      "customCardsInHand": 0,
+      "knightCardsPlayed": 0,
+      "resources": {"ORE":2,"WOOD":2,"BRICK":1,"WHEAT":1,"BANANA":1},
+      "buildings": [
+        {"intersectionId":3,"buildingType":"SETTLEMENT"},
+        {"intersectionId":14,"buildingType":"SETTLEMENT"}
+      ],
+      "pipePathIds": [2,14,15],
+      "heldSpecialCards": []
+    },
+    {
+      "name": "AggressiveBot",
+      "color": "RED",
+      "isBot": true,
+      "botStrategyName": "AggressiveBot",
+      "knightCardsInHand": 0,
+      "progressCardsInHand": 0,
+      "victoryPointCardsInHand": 0,
+      "customCardsInHand": 0,
+      "knightCardsPlayed": 0,
+      "resources": {"ORE":0,"WOOD":1,"BRICK":2,"WHEAT":2,"BANANA":1},
+      "buildings": [
+        {"intersectionId":1,"buildingType":"SETTLEMENT"},
+        {"intersectionId":10,"buildingType":"SETTLEMENT"}
+      ],
+      "pipePathIds": [0,9],
+      "heldSpecialCards": []
+    }
+  ]
+}
