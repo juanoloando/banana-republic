@@ -4,19 +4,6 @@ import model.player.Player;
 import model.resource.ResourceType;
 import model.resource.Bank;
 
-/**
- * GreedyBot – Strategi: "Kumpulkan material Settlement secepat mungkin."
- *
- * Mekanisme inti:
- *   1. Stop trading begitu bisa afford Settlement (WOOD+BRICK+WHEAT+BANANA).
- *      GameController lalu memanggil engine.buildSettlement() dengan resource itu.
- *   2. Jika belum bisa afford settlement, cari resource surplus (>= 4) dan
- *      trade 4:1 ke bank menuju resource yang paling kurang (settlement priority).
- *   3. Tidak pernah "mengonsumsi" resource sendiri — selalu biarkan engine
- *      yang mengurangi resource saat build, supaya tidak ada phantom card-use.
- *
- * Filosofi: Maximize jumlah settlement → maximize VP dan produksi resource.
- */
 public class GreedyBot implements PlayerStrategy {
 
     @Override
@@ -31,7 +18,6 @@ public class GreedyBot implements PlayerStrategy {
         while (traded && safetyLimit-- > 0) {
             traded = false;
 
-            // Stop if we already have enough for a settlement – controller will build it.
             if (canAffordSettlement(self)) break;
 
             ResourceType surplus = findSurplus(self, 4);
@@ -55,7 +41,6 @@ public class GreedyBot implements PlayerStrategy {
             && self.getResourceCount(ResourceType.BANANA) >= 1;
     }
 
-    /** Resource with the most units owned by the player (>= threshold). */
     private ResourceType findSurplus(Player self, int threshold) {
         ResourceType best = null;
         int maxCount = threshold - 1;
@@ -66,10 +51,6 @@ public class GreedyBot implements PlayerStrategy {
         return best;
     }
 
-    /**
-     * Most-needed resource for a settlement (WOOD > BRICK > WHEAT > BANANA > ORE),
-     * skipping the surplus type and types unavailable in bank.
-     */
     private ResourceType findSettlementDeficit(Player self, ResourceType exclude, Bank bank) {
         ResourceType[] priority = {
             ResourceType.WOOD, ResourceType.BRICK,

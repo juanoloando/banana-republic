@@ -4,10 +4,6 @@ import model.card.GameStateContext;
 import model.player.Player;
 import model.resource.ResourceType;
 
-/**
- * Test plugin card: gives the active player 2 Wood from the bank.
- * Load this JAR via Settings > Load Card Plugin to test the plugin system.
- */
 public class BonusResourceCard implements ExperimentCard {
 
     @Override
@@ -27,13 +23,11 @@ public class BonusResourceCard implements ExperimentCard {
 
     @Override
     public void applyEffect(GameStateContext state, Player player) {
-        // Give the active player 2 Wood from the bank if available
         if (state.getBank().hasResource(ResourceType.WOOD, 2)) {
             state.giveResourceToPlayer(player, ResourceType.WOOD, 2);
         } else if (state.getBank().hasResource(ResourceType.WOOD, 1)) {
             state.giveResourceToPlayer(player, ResourceType.WOOD, 1);
         }
-        // (No action if bank has no Wood)
     }
 
     @Override
