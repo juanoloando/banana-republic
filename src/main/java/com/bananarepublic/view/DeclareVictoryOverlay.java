@@ -7,7 +7,6 @@ import javafx.animation.ScaleTransition;
 import javafx.animation.Timeline;
 import javafx.animation.KeyFrame;
 import javafx.animation.TranslateTransition;
-import javafx.scene.Group;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
@@ -17,6 +16,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.media.AudioClip;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import com.bananarepublic.view.util.DialogUtil;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
 import javafx.util.Duration;
@@ -32,14 +32,12 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-public class DeclareVictoryOverlay {
+public class DeclareVictoryOverlay extends BaseOverlay {
 
     private static final double ASSET_WIDTH = 1998.0;
     private static final double ASSET_HEIGHT = 1124.0;
 
-    @FXML private StackPane overlayRoot;
     @FXML private StackPane centerLayer;
-    @FXML private Group modalScaleGroup;
     @FXML private Pane popupContainer;
     @FXML private ImageView popupImageView;
     @FXML private Pane fireworksLayer;
@@ -122,10 +120,7 @@ public class DeclareVictoryOverlay {
         preloadVictoryAudio();
         setupVictoryMotion();
         setupFireworksSpawner();
-        if (overlayRoot != null) {
-            overlayRoot.widthProperty().addListener((obs, oldVal, newVal) -> normalizePopupScale());
-            overlayRoot.heightProperty().addListener((obs, oldVal, newVal) -> normalizePopupScale());
-        }
+        initializeOverlayListeners();
         hideDeclareVictoryScreen();
         normalizePopupScale();
     }
@@ -168,10 +163,7 @@ public class DeclareVictoryOverlay {
         VictoryLeaderboardEntry winner = renderWinner(entries, currentPlayerEntry.playerIndex);
         renderLeaderboard(entries);
 
-        overlayRoot.setVisible(true);
-        overlayRoot.setManaged(true);
-        overlayRoot.toFront();
-        normalizePopupScale();
+        showBase();
         startVictoryEffects();
         System.out.println("Declare Victory success: winner = " + winner.playerName);
         return true;
@@ -180,8 +172,7 @@ public class DeclareVictoryOverlay {
     public void hideDeclareVictoryScreen() {
         if (overlayRoot == null) return;
         stopVictoryEffects();
-        overlayRoot.setVisible(false);
-        overlayRoot.setManaged(false);
+        hideBase();
     }
 
     private boolean canDeclareVictory(int currentPlayerVp) {
@@ -249,17 +240,12 @@ public class DeclareVictoryOverlay {
     private void onVictorySaveClicked() {
         System.out.println("Victory save clicked");
 
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Save Game");
-        fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Banana Republic Save (*.json)", "*.json")
-        );
-        fileChooser.setInitialFileName("banana_republic_save.json");
-
         Window owner = overlayRoot != null && overlayRoot.getScene() != null
                 ? overlayRoot.getScene().getWindow()
                 : null;
-        File selectedFile = fileChooser.showSaveDialog(owner);
+        File selectedFile = DialogUtil.showSaveFile("Save Game", "banana_republic_save.json", owner,
+                new FileChooser.ExtensionFilter("Banana Republic Save (*.json)", "*.json")
+        );
         if (selectedFile == null) {
             System.out.println("Save dialog cancelled");
             return;
@@ -293,7 +279,8 @@ public class DeclareVictoryOverlay {
         return new File(absoluteFile.getParentFile(), absoluteFile.getName() + ".json");
     }
 
-    private void normalizePopupScale() {
+    @Override
+    protected void normalizePopupScale() {
         if (modalScaleGroup == null || overlayRoot == null) return;
         double rootW = overlayRoot.getWidth();
         double rootH = overlayRoot.getHeight();

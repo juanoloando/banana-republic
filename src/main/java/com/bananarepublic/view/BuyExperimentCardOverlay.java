@@ -2,7 +2,6 @@ package com.bananarepublic.view;
 
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
-import javafx.scene.Group;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
@@ -17,7 +16,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-public class BuyExperimentCardOverlay {
+public class BuyExperimentCardOverlay extends BaseOverlay {
 
     private static final double POPUP_WIDTH = 887.0;
     private static final double POPUP_HEIGHT = 1136.0;
@@ -30,10 +29,8 @@ public class BuyExperimentCardOverlay {
     private static final double BUY_W = 199.0;
     private static final double BUY_H = 52.0;
 
-    @FXML private StackPane overlayRoot;
     @FXML private Pane overlayBackdrop;
     @FXML private StackPane centerLayer;
-    @FXML private Group modalScaleGroup;
     @FXML private Pane popupContainer;
     @FXML private ImageView popupImageView;
     @FXML private HBox requiredResourceRow;
@@ -65,10 +62,7 @@ public class BuyExperimentCardOverlay {
             buyExperimentBuyButton.setPrefWidth(BUY_W);
             buyExperimentBuyButton.setPrefHeight(BUY_H);
         }
-        if (overlayRoot != null) {
-            overlayRoot.widthProperty().addListener((obs, oldVal, newVal) -> normalizePopupScale());
-            overlayRoot.heightProperty().addListener((obs, oldVal, newVal) -> normalizePopupScale());
-        }
+        initializeOverlayListeners();
         clearMessage();
         renderRequiredResources();
         renderYourResources();
@@ -93,15 +87,11 @@ public class BuyExperimentCardOverlay {
         clearMessage();
         renderRequiredResources();
         renderYourResources();
-        overlayRoot.setVisible(true);
-        overlayRoot.setManaged(true);
-        overlayRoot.toFront();
-        normalizePopupScale();
+        showBase();
     }
 
     public void hideOverlay() {
-        overlayRoot.setVisible(false);
-        overlayRoot.setManaged(false);
+        hideBase();
         clearMessage();
     }
 
@@ -228,7 +218,8 @@ public class BuyExperimentCardOverlay {
         buyExperimentMessageLabel.setManaged(false);
     }
 
-    private void normalizePopupScale() {
+    @Override
+    protected void normalizePopupScale() {
         if (popupContainer == null || overlayRoot == null) return;
         double rootW = Math.max(overlayRoot.getWidth(), 1.0);
         double rootH = Math.max(overlayRoot.getHeight(), 1.0);

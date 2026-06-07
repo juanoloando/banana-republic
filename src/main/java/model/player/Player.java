@@ -12,4 +12,6 @@ public interface Player {
     void addResource(ResourceType type, int amount);
     void removeResource(ResourceType type, int amount);
     boolean canAfford(java.util.Map<? extends ResourceType, ? extends Integer> cost);
+
+    default boolean isBot() { return false; }
 }

@@ -9,9 +9,9 @@ import java.util.Map;
 
 import com.bananarepublic.BananaRepublic;
 import com.bananarepublic.controller.GameSession;
+import com.bananarepublic.view.util.DialogUtil;
 
 import javafx.fxml.FXML;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
@@ -152,8 +152,6 @@ public class LobbyView {
         environmentFileLabel.setTooltip(new Tooltip(selectedFile.getAbsolutePath()));
 
         System.out.println("Environment Data plugin selected: " + selectedFile.getAbsolutePath());
-
-        // TODO: sambungkan ke MapPluginLoader dari anggota 3.
     }
 
     @FXML
@@ -208,7 +206,7 @@ public class LobbyView {
         int playerCount = getSelectedPlayerCount();
 
         if (!isValidPlayerSetup(playerCount)) {
-            showWarning("Player name tidak boleh kosong.");
+            DialogUtil.showWarning("Session Setup", "Player name tidak boleh kosong.");
             return;
         }
 
@@ -246,14 +244,10 @@ public class LobbyView {
     }
 
     private File chooseJarFile(String title) {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle(title);
-        fileChooser.getExtensionFilters().addAll(
+        return DialogUtil.showOpenFile(title, rootPane.getScene().getWindow(),
                 new FileChooser.ExtensionFilter("JAR Plugin Files", "*.jar"),
                 new FileChooser.ExtensionFilter("All Files", "*.*")
         );
-
-        return fileChooser.showOpenDialog(rootPane.getScene().getWindow());
     }
 
     private int getSelectedPlayerCount() {
@@ -293,7 +287,7 @@ public class LobbyView {
         for (int i = 0; i < names.size(); i++) {
             File botFile = selectedBotPluginFiles.get(i);
             if (botFile != null && !botFile.exists()) {
-                showWarning("Bot plugin file for " + names.get(i) + " cannot be found.");
+                DialogUtil.showWarning("Session Setup", "Bot plugin file for " + names.get(i) + " cannot be found.");
                 return false;
             }
         }
@@ -407,11 +401,4 @@ public class LobbyView {
         return fileName.substring(0, 10) + "..." + fileName.substring(fileName.length() - 10);
     }
 
-    private void showWarning(String message) {
-        Alert alert = new Alert(Alert.AlertType.WARNING);
-        alert.setTitle("Session Setup");
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
-    }
 }

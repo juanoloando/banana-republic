@@ -1,6 +1,22 @@
 package com.bananarepublic.controller;
 
-import engine.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+import engine.BuildValidator;
+import engine.DiceResult;
+import engine.GameEngine;
+import engine.GameEngineAdapter;
+import engine.TurnPhase;
+import engine.VictoryManager;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.util.Duration;
@@ -16,8 +32,6 @@ import model.player.Player;
 import model.resource.Bank;
 import model.resource.ResourceType;
 import plugin.BotPlayer;
-
-import java.util.*;
 
 /**
  * Bridge layer antara UI dan GameEngine.
@@ -325,11 +339,10 @@ public class GameController extends GameEngineAdapter {
         Platform.runLater(() -> { if (uiCallback != null) uiCallback.onGameWon(winner); });
     }
 
-    // ── Bot automation ────────────────────────────────────────────────
-
+  
     private static final double BOT_ACTION_DELAY_SEC = 1.2;
 
-    /** Schedule the active bot's action for the given phase after a short visual delay. */
+  
     private void scheduleBotActionIfNeeded(TurnPhase phase) {
         if (engine.getState().isGameOver()) return;
         Player active = engine.getState().getActivePlayer();
@@ -340,7 +353,6 @@ public class GameController extends GameEngineAdapter {
         delay.play();
     }
 
-    /** Dispatch the correct action for the given phase; guards stale callbacks. */
     private void executeBotPhaseAction(BotPlayer bot, TurnPhase phase) {
         if (engine.getState().isGameOver()) return;
         if (!engine.getState().getActivePlayer().equals(bot)) return;
@@ -368,7 +380,7 @@ public class GameController extends GameEngineAdapter {
         }
     }
 
-    /** Place a random valid settlement then a random adjacent pipe during setup. */
+    
     private void executeBotSetup(BotPlayer bot) {
         Set<Integer> validSettlements = getValidSettlementIds(bot);
         if (validSettlements.isEmpty()) return;
@@ -383,7 +395,7 @@ public class GameController extends GameEngineAdapter {
         engine.buildPipeSetup(pipeId, intersectionId);
     }
 
-    /** Move robber to a non-desert tile, then steal from the richest adjacent player. */
+    
     private void executeBotRobberMove(BotPlayer bot) {
         HexCoordinate current = engine.getState().getRobberPosition();
         HexCoordinate target = engine.getState().getBoard().getAllTiles().stream()
@@ -407,37 +419,125 @@ public class GameController extends GameEngineAdapter {
         }
     }
 
-    /** Run the bot's resource strategy, then spend resources on builds, then end the turn. */
+    
+    private BotPlayer pendingBotPlayer = null;
+
+ 
     private void executeBotTradeBuild(BotPlayer bot) {
         engine.stopTradeBuildTimer();
 
-        // 1. Strategy: gather resources via bank trades (does NOT auto-play/buy any cards).
+       
         try {
             bot.executeTurn(engine.getState(), engine);
         } catch (Exception e) {
             System.err.println("[BOT] " + bot.getName() + " strategy error: " + e.getMessage());
         }
 
-        // 2. Spend gathered resources on actual builds (lab > settlement > pipe).
-        //    Cards are intentionally excluded — bots do NOT auto-play experiment cards.
+        
+        if (engine.getState().getCurrentPhase() == TurnPhase.TRADE_BUILD
+                && !engine.getState().isGameOver()) {
+            com.bananarepublic.trade.TradeOffer proposal = generateBotPlayerTradeProposal(bot);
+            if (proposal != null && uiCallback != null) {
+                pendingBotPlayer = bot;
+                uiCallback.onBotPlayerTradeProposed(proposal);
+                return; // paused — resumeBotTurnAfterTrade() will call builds + endTurn
+            }
+        }
+
+     
         if (engine.getState().getCurrentPhase() == TurnPhase.TRADE_BUILD
                 && !engine.getState().isGameOver()) {
             tryBotBuildActions(bot);
         }
 
-        // 3. End turn.
+       
         if (engine.getState().getCurrentPhase() == TurnPhase.TRADE_BUILD
                 && !engine.getState().isGameOver()) {
             engine.endTurn();
         }
     }
 
-    /**
-     * Attempt builds in priority order: lab upgrade → new settlement → pipe.
-     * Loops until nothing affordable/valid remains, so one TRADE_BUILD phase can place
-     * multiple structures when the bot has sufficient resources.
-     * Experiment-card purchasing is intentionally omitted to prevent auto-use of cards.
-     */
+  
+    public void resumeBotTurnAfterTrade() {
+        if (pendingBotPlayer == null) return;
+        BotPlayer bot = pendingBotPlayer;
+        pendingBotPlayer = null;
+        Platform.runLater(() -> {
+            if (engine.getState().getCurrentPhase() == TurnPhase.TRADE_BUILD
+                    && !engine.getState().isGameOver()) {
+                tryBotBuildActions(bot);
+            }
+            if (engine.getState().getCurrentPhase() == TurnPhase.TRADE_BUILD
+                    && !engine.getState().isGameOver()) {
+                engine.endTurn();
+            }
+        });
+    }
+
+   
+    private com.bananarepublic.trade.TradeOffer generateBotPlayerTradeProposal(BotPlayer bot) {
+        List<Player> allPlayers = engine.getState().getAllPlayers();
+        int botIdx = allPlayers.indexOf(bot);
+        if (botIdx < 0) return null;
+
+     
+        ResourceType needed = findBotMostNeededResource(bot);
+        if (needed == null || bot.getResourceCount(needed) >= 2) return null;
+
+        
+        ResourceType surplus = findBotBestSurplus(bot, needed);
+        if (surplus == null) return null;
+        int giveAmt = Math.min(2, bot.getResourceCount(surplus) - 1); // keep at least 1
+        if (giveAmt < 1) return null;
+
+        
+        for (int i = 0; i < allPlayers.size(); i++) {
+            Player target = allPlayers.get(i);
+            if (target.isBot()) continue;               
+            if (target.getResourceCount(needed) < 1) continue;
+        
+            int receiveAmt = 1;
+
+            com.bananarepublic.trade.TradeOffer offer = new com.bananarepublic.trade.TradeOffer();
+            offer.proposerIndex = botIdx;
+            offer.receiverIndex = i;
+            offer.give.put(surplus, giveAmt);
+            offer.receive.put(needed, receiveAmt);
+            offer.counter = false;
+            return offer; // propose to the first eligible human
+        }
+        return null;
+    }
+
+    private ResourceType findBotMostNeededResource(BotPlayer bot) {
+        
+        int[] needs = {
+            Math.max(0, 1 - bot.getResourceCount(ResourceType.WOOD)),
+            Math.max(0, 1 - bot.getResourceCount(ResourceType.BRICK)),
+            Math.max(0, 1 - bot.getResourceCount(ResourceType.BANANA)),
+            Math.max(0, 3 - bot.getResourceCount(ResourceType.ORE)),
+            Math.max(0, 2 - bot.getResourceCount(ResourceType.WHEAT)),
+        };
+        ResourceType[] types = { ResourceType.WOOD, ResourceType.BRICK,
+                ResourceType.BANANA, ResourceType.ORE, ResourceType.WHEAT };
+        ResourceType best = null; int maxNeed = 0;
+        for (int i = 0; i < needs.length; i++) {
+            if (needs[i] > maxNeed) { maxNeed = needs[i]; best = types[i]; }
+        }
+        return best;
+    }
+
+    private ResourceType findBotBestSurplus(BotPlayer bot, ResourceType exclude) {
+        ResourceType surplus = null; int maxHeld = 2; // only give if holding > 2
+        for (ResourceType t : ResourceType.values()) {
+            if (t == exclude) continue;
+            int count = bot.getResourceCount(t);
+            if (count > maxHeld) { maxHeld = count; surplus = t; }
+        }
+        return surplus;
+    }
+
+
     private void tryBotBuildActions(BotPlayer bot) {
         int guard = 20;
         while (guard-- > 0
@@ -493,7 +593,20 @@ public class GameController extends GameEngineAdapter {
         }
     }
 
-    /** Build a discard map: drop the most-abundant resources first. */
+   
+    public void autoBotDiscardPlayer(Player player) {
+        if (!(player instanceof BotPlayer)) return;
+        BotPlayer bot = (BotPlayer) player;
+        int count = engine.computeDiscardCount(bot);
+        if (count <= 0) return;
+        try {
+            engine.discardResources(bot, makeBotDiscardMap(bot, count));
+        } catch (Exception e) {
+            System.err.println("[BOT] " + bot.getName() + " fallback discard error: " + e.getMessage());
+        }
+    }
+
+    
     private Map<ResourceType, Integer> makeBotDiscardMap(BotPlayer bot, int count) {
         Map<ResourceType, Integer> map = new EnumMap<>(ResourceType.class);
         int remaining = count;

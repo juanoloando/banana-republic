@@ -2,7 +2,6 @@ package com.bananarepublic.view;
 
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
-import javafx.scene.Group;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -14,7 +13,7 @@ import javafx.scene.layout.StackPane;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
-public class RollDiceManualOverlay {
+public class RollDiceManualOverlay extends BaseOverlay {
 
     private static final double POPUP_WIDTH = 887.0;
     private static final double POPUP_HEIGHT = 722.0;
@@ -27,9 +26,7 @@ public class RollDiceManualOverlay {
     private static final double ROLL_W = 199.0;
     private static final double ROLL_H = 52.0;
 
-    @FXML private StackPane overlayRoot;
     @FXML private StackPane centerLayer;
-    @FXML private Group modalScaleGroup;
     @FXML private Pane popupContainer;
     @FXML private ImageView popupImageView;
     @FXML private ComboBox<Integer> dice1ComboBox;
@@ -90,10 +87,7 @@ public class RollDiceManualOverlay {
             dice2ImageView.getStyleClass().add("dice-manual-image");
             updateDiceImage(dice2ImageView, 1);
         }
-        if (overlayRoot != null) {
-            overlayRoot.widthProperty().addListener((obs, oldVal, newVal) -> normalizePopupScale());
-            overlayRoot.heightProperty().addListener((obs, oldVal, newVal) -> normalizePopupScale());
-        }
+        initializeOverlayListeners();
         clearError();
         normalizePopupScale();
     }
@@ -114,15 +108,11 @@ public class RollDiceManualOverlay {
         }
         updateDiceImage(dice1ImageView, dice1ComboBox == null ? 1 : dice1ComboBox.getValue());
         updateDiceImage(dice2ImageView, dice2ComboBox == null ? 1 : dice2ComboBox.getValue());
-        overlayRoot.setVisible(true);
-        overlayRoot.setManaged(true);
-        overlayRoot.toFront();
-        normalizePopupScale();
+        showBase();
     }
 
     public void hideOverlay() {
-        overlayRoot.setVisible(false);
-        overlayRoot.setManaged(false);
+        hideBase();
         clearError();
     }
 
@@ -174,7 +164,8 @@ public class RollDiceManualOverlay {
         view.setImage(new Image(getClass().getResource(path).toExternalForm()));
     }
 
-    private void normalizePopupScale() {
+    @Override
+    protected void normalizePopupScale() {
         if (modalScaleGroup == null || overlayRoot == null) return;
         double rootW = Math.max(overlayRoot.getWidth(), 1.0);
         double rootH = Math.max(overlayRoot.getHeight(), 1.0);

@@ -4,9 +4,6 @@ import model.card.GameStateContext;
 import model.player.Player;
 import model.resource.ResourceType;
 
-/**
- * Test plugin card: take 1 of any single resource type from the bank.
- */
 public class WildcardCard implements ExperimentCard {
 
     @Override
