@@ -74,10 +74,10 @@
       "heldSpecialCards": []
     },
     {
-      "name": "GreedyBot",
+      "name": "SmartBot",
       "color": "BLUE",
       "isBot": true,
-      "botStrategyName": "GreedyBot",
+      "botStrategyName": "SmartBot",
       "knightCardsInHand": 0,
       "progressCardsInHand": 0,
       "victoryPointCardsInHand": 0,
