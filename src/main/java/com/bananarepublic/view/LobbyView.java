@@ -197,8 +197,6 @@ public class LobbyView {
 
         updateBotButtonsState();
         updateAutomationInfo();
-
-        // TODO: sambungkan path bot per player ini ke BotPluginLoader dari anggota 3.
     }
 
     @FXML
