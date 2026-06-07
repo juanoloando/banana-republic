@@ -11,4 +11,13 @@ public enum PlayerColor {
             case YELLOW -> "Kuning";
         };
     }
+
+    public String getCssName() {
+        return switch (this) {
+            case YELLOW -> "yellow";
+            case BLUE   -> "blue";
+            case RED    -> "red";
+            case GREEN  -> "green";
+        };
+    }
 }

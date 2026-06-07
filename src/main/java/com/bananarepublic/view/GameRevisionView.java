@@ -1394,7 +1394,6 @@ public class GameRevisionView implements GameViewCallback {
             bankTradeBankResources.put(resourceTypeUI, 0);
         }
 
-        // TODO: replace with real GameState/Player/Bank adapter once engine API is ready.
         bankTradePlayerResources.put(ResourceTypeUI.BANANA, getResourceAmount(activePlayerIndex, ResourceType.BANANA));
         bankTradePlayerResources.put(ResourceTypeUI.WOOD, getResourceAmount(activePlayerIndex, ResourceType.WOOD));
         bankTradePlayerResources.put(ResourceTypeUI.WHEAT, getResourceAmount(activePlayerIndex, ResourceType.WHEAT));
@@ -4876,6 +4875,10 @@ public class GameRevisionView implements GameViewCallback {
     }
 
     private String getPlayerColorName(int idx) {
+        if (gameController != null) {
+            java.util.List<Player> ps = gameController.getAllPlayers();
+            if (idx >= 0 && idx < ps.size()) return ps.get(idx).getColor().getCssName();
+        }
         return switch (idx % 4) {
             case 0 -> "yellow";
             case 1 -> "blue";
@@ -4885,11 +4888,24 @@ public class GameRevisionView implements GameViewCallback {
     }
 
     private javafx.scene.paint.Color getPlayerJavafxColor(int idx) {
+        if (gameController != null) {
+            java.util.List<Player> ps = gameController.getAllPlayers();
+            if (idx >= 0 && idx < ps.size()) return toJavafxColor(ps.get(idx).getColor());
+        }
         return switch (idx % 4) {
             case 0 -> javafx.scene.paint.Color.GOLD;
             case 1 -> javafx.scene.paint.Color.DODGERBLUE;
             case 2 -> javafx.scene.paint.Color.RED;
             default -> javafx.scene.paint.Color.LIMEGREEN;
+        };
+    }
+
+    private static javafx.scene.paint.Color toJavafxColor(model.player.PlayerColor color) {
+        return switch (color) {
+            case YELLOW -> javafx.scene.paint.Color.GOLD;
+            case BLUE   -> javafx.scene.paint.Color.DODGERBLUE;
+            case RED    -> javafx.scene.paint.Color.RED;
+            case GREEN  -> javafx.scene.paint.Color.LIMEGREEN;
         };
     }
 
@@ -6206,14 +6222,11 @@ public class GameRevisionView implements GameViewCallback {
     }
 
     private void performSaveGame() {
-        javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
-        chooser.setTitle("Save Game");
-        chooser.getExtensionFilters().add(
+        javafx.stage.Window window = rootPane.getScene() != null ? rootPane.getScene().getWindow() : null;
+        java.io.File file = com.bananarepublic.view.util.DialogUtil.showSaveFile(
+            "Save Game", "banana_republic_save.json", window,
             new javafx.stage.FileChooser.ExtensionFilter("JSON Save Files", "*.json")
         );
-        chooser.setInitialFileName("banana_republic_save.json");
-        javafx.stage.Window window = rootPane.getScene() != null ? rootPane.getScene().getWindow() : null;
-        java.io.File file = chooser.showSaveDialog(window);
         if (file != null) {
             boolean ok = gameController.saveGame(file);
             if (ok) {
@@ -6249,13 +6262,11 @@ public class GameRevisionView implements GameViewCallback {
         browseBtn.setDisable(gameController == null);
         browseBtn.setOnAction(e -> {
             if (gameController == null) return;
-            javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
-            chooser.setTitle("Load Card Plugin");
-            chooser.getExtensionFilters().add(
+            javafx.stage.Window window = rootPane.getScene() != null ? rootPane.getScene().getWindow() : null;
+            java.io.File jarFile = com.bananarepublic.view.util.DialogUtil.showOpenFile(
+                "Load Card Plugin", window,
                 new javafx.stage.FileChooser.ExtensionFilter("JAR Plugin Files", "*.jar")
             );
-            javafx.stage.Window window = rootPane.getScene() != null ? rootPane.getScene().getWindow() : null;
-            java.io.File jarFile = chooser.showOpenDialog(window);
             if (jarFile != null) {
                 try {
                     gameController.injectCardPlugin(jarFile);

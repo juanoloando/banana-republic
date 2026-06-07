@@ -8,7 +8,7 @@ import com.bananarepublic.BananaRepublic;
 import com.bananarepublic.controller.GameSession;
 
 import javafx.fxml.FXML;
-import javafx.scene.control.Alert;
+import com.bananarepublic.view.util.DialogUtil;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.AnchorPane;
@@ -50,15 +50,12 @@ public class LoadGameView {
 
     @FXML
     private void onChooseFileClicked() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Choose Saved Game File");
-
-        fileChooser.getExtensionFilters().addAll(
+        selectedFile = DialogUtil.showOpenFile(
+                "Choose Saved Game File",
+                selectedFileLabel.getScene().getWindow(),
                 new FileChooser.ExtensionFilter("JSON Save Files", "*.json"),
                 new FileChooser.ExtensionFilter("All Files", "*.*")
         );
-
-        selectedFile = fileChooser.showOpenDialog(selectedFileLabel.getScene().getWindow());
 
         if (selectedFile != null) {
             selectedFileLabel.setText(shortenFileName(selectedFile.getName()));
@@ -69,12 +66,12 @@ public class LoadGameView {
     @FXML
     private void onLoadGameClicked() {
         if (selectedFile == null) {
-            showWarning("Please choose a save file first.");
+            DialogUtil.showWarning("Load Game", "Please choose a save file first.");
             return;
         }
 
         if (!saveLoadService.isValidSave(selectedFile)) {
-            showWarning("Selected file is not a valid JSON save file.");
+            DialogUtil.showWarning("Load Game", "Selected file is not a valid JSON save file.");
             return;
         }
 
@@ -100,11 +97,11 @@ public class LoadGameView {
 
             BananaRepublic.showGame();
         } catch (IOException e) {
-            showError("Failed to read save file:\n" + e.getMessage());
+            DialogUtil.showError("Load Game", "Failed to read save file:\n" + e.getMessage());
         } catch (SaveCorruptedException e) {
-            showError("Save file is corrupted:\n" + e.getMessage());
+            DialogUtil.showError("Load Game", "Save file is corrupted:\n" + e.getMessage());
         } catch (Exception e) {
-            showError("Failed to load game:\n" + e.getMessage());
+            DialogUtil.showError("Load Game", "Failed to load game:\n" + e.getMessage());
         }
     }
 
@@ -116,22 +113,6 @@ public class LoadGameView {
         } else {
             BananaRepublic.showMainMenu();
         }
-    }
-
-    private void showWarning(String message) {
-        Alert alert = new Alert(Alert.AlertType.WARNING);
-        alert.setTitle("Load Game");
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
-    }
-
-    private void showError(String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Load Game");
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
     }
 
     private String shortenFileName(String fileName) {
