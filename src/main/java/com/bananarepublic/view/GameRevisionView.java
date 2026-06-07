@@ -1,29 +1,39 @@
 package com.bananarepublic.view;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+
 import com.bananarepublic.BananaRepublic;
 import com.bananarepublic.controller.CardDataProvider;
-import com.bananarepublic.view.card.CardDefinition;
-import com.bananarepublic.view.card.CardDefinitions;
 import com.bananarepublic.controller.CardEffectService;
-import com.bananarepublic.view.card.CardTemplateRenderer;
-import model.card.CardType;
-import model.card.CardUseResult;
-import model.card.PlayerCardInventory;
-import model.card.UsedCardTracker;
-import com.bananarepublic.view.card.UseCardOverlayManager;
 import com.bananarepublic.controller.GameController;
-import com.bananarepublic.controller.GameViewCallback;
 import com.bananarepublic.controller.GameSession;
+import com.bananarepublic.controller.GameViewCallback;
 import com.bananarepublic.trade.BankTradeService;
-import com.bananarepublic.trade.HarborType;
 import com.bananarepublic.trade.HarborTradeService;
+import com.bananarepublic.trade.HarborType;
 import com.bananarepublic.trade.PlayerTradeService;
 import com.bananarepublic.trade.TradeMode;
 import com.bananarepublic.trade.TradeOffer;
 import com.bananarepublic.trade.TradeOverlayManager;
 import com.bananarepublic.trade.TradeOverlayRefs;
 import com.bananarepublic.trade.TradeResource;
+import com.bananarepublic.view.card.CardDefinition;
+import com.bananarepublic.view.card.CardDefinitions;
+import com.bananarepublic.view.card.CardTemplateRenderer;
+import com.bananarepublic.view.card.UseCardOverlayManager;
 import com.bananarepublic.view.renderer.HexRevisionRenderer;
+
 import engine.DiceResult;
 import engine.TurnPhase;
 import javafx.animation.Animation;
@@ -32,35 +42,41 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
+import javafx.scene.Group;
 import javafx.scene.Node;
-import javafx.util.Duration;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.Group;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.layout.*;
+import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
-import model.board.*;
-import model.card.CardCategory;
+import javafx.util.Duration;
+import model.board.Board;
+import model.board.BoardPath;
+import model.board.Harbor;
+import model.board.HexCoordinate;
+import model.board.HexTile;
+import model.board.Intersection;
+import model.board.StandardMapGenerator;
+import model.board.TerrainType;
+import model.card.CardType;
+import model.card.CardUseResult;
 import model.card.ExperimentCard;
 import model.card.MonopolyCard;
+import model.card.PlayerCardInventory;
+import model.card.UsedCardTracker;
 import model.player.Player;
 import model.resource.ResourceType;
 import persistence.SaveData;
-
-import java.io.IOException;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-
-import java.util.*;
 
 public class GameRevisionView implements GameViewCallback {
 
@@ -75,12 +91,12 @@ public class GameRevisionView implements GameViewCallback {
             CardType.LARGEST_ARMY
     );
 
-    // ── FXML bindings ─────────────────────────────────────────────────
+    
     @FXML private StackPane rootPane;
     @FXML private AnchorPane designPane;
     @FXML private Pane boardPane;
 
-    // Top bar
+    
     @FXML private Label turnLabel;
     @FXML private Label timerLabel;
     @FXML private Button diceButton;
@@ -88,7 +104,7 @@ public class GameRevisionView implements GameViewCallback {
     @FXML private Button saveButton;
     @FXML private Button loadButton;
 
-    // Player rows
+    
     @FXML private Pane player1Row;
     @FXML private Pane player2Row;
     @FXML private Pane player3Row;
@@ -129,11 +145,11 @@ public class GameRevisionView implements GameViewCallback {
     @FXML private Label player3PipeLabel;
     @FXML private Label player4PipeLabel;
 
-    // Inventory
+    
     @FXML private FlowPane inventoryResourceRow;
     @FXML private FlowPane inventoryCardRow;
 
-    // Info panel (LOG / BANK)
+    
     @FXML private StackPane infoPanelContainer;
     @FXML private Pane      logPanel;
     @FXML private ScrollPane logScrollPane;
@@ -141,7 +157,7 @@ public class GameRevisionView implements GameViewCallback {
     @FXML private Pane      bankPanel;
     @FXML private HBox       bankCardRow;
 
-    // Popup
+    
     @FXML private StackPane tradeOverlayRoot;
     @FXML private StackPane tradeOverlayCenterLayer;
     @FXML private Group tradeModalScaleGroup;
@@ -196,7 +212,7 @@ public class GameRevisionView implements GameViewCallback {
     @FXML private StackPane declareVictoryOverlay;
     @FXML private DeclareVictoryOverlay declareVictoryOverlayController;
 
-    // Build popups
+    
     @FXML private Pane      pipePopupPane;
     @FXML private Pane      buildingPopupPane;
     @FXML private javafx.scene.shape.Rectangle labHighlight;
@@ -205,8 +221,8 @@ public class GameRevisionView implements GameViewCallback {
     @FXML private Button    selectLabButton;
     @FXML private Button    selectOutpostButton;
 
-    // ── State ─────────────────────────────────────────────────────────
-    // ── Bridge layer ──────────────────────────────────────────────────
+    
+    
     private GameController gameController;
     private final Map<Integer, PlayerCardInventory> playerCardInventories = new HashMap<>();
     private final UsedCardTracker usedCardTracker = new UsedCardTracker();
@@ -218,18 +234,18 @@ public class GameRevisionView implements GameViewCallback {
     private final HexRevisionRenderer hexRevisionRenderer = new HexRevisionRenderer();
     private final Map<ResourceType, Label> resourceBadgeLabels = new EnumMap<>(ResourceType.class);
 
-    // ── Z-order layers (added to boardPane after tiles) ───────────────
-    // Order from bottom: circleLayer → pipeLayer → buildingLayer (top)
+    
+    
     private final Pane circleLayer   = new Pane();
     private final Pane pipeLayer     = new Pane();
     private final Pane buildingLayer = new Pane();
 
-    // Build mode state
+    
     private enum BuildType { NONE, OUTPOST, LAB, PIPE }
     private BuildType pendingBuildType      = BuildType.NONE;
     private int       pendingBuildId        = -1;
-    private int       setupLastSettlementId = -1; // setup phase: ID settlement terakhir
-    // Selection in building popup: null = belum dipilih, "lab" atau "outpost"
+    private int       setupLastSettlementId = -1; 
+    
     private String    pendingBuildingSubType = null;
     private Timeline  buildingSelectErrorTimeline;
     private final Map<Integer, HBox> playerCardBoxes = new HashMap<>();
@@ -237,24 +253,24 @@ public class GameRevisionView implements GameViewCallback {
     private int activePlayerIndex = 0;
     private Font arcadeFont;
     private Font introFont;
-    // Currently visible info panel ("log", "bank", or "" for none)
+    
     private String activeInfoPanel = "";
 
-    // Local resource snapshot for overlay callbacks
+    
     private final Map<ResourceType, Integer> playerResourceCounts = new EnumMap<>(ResourceType.class);
-    // Current board — set after renderHexBoard(), used for build mode
+    
     private Board currentBoard;
 
-    // ── Auto-roll countdown state ────────────────────────────────────
+    
     private Timeline autoRollTimeline;
     private static final int AUTO_ROLL_SECONDS = 60;
 
-    // ── Timer state ──────────────────────────────────────────────────
+    
     private static final int DEFAULT_TURN_SECONDS = 90;
     private Timeline timerTimeline;
     private int remainingSeconds = DEFAULT_TURN_SECONDS;
 
-    // ── Dice state ────────────────────────────────────────────────────
+    
     private Timeline diceTimeline;
     private ImageView diceView1;
     private ImageView diceView2;
@@ -263,8 +279,8 @@ public class GameRevisionView implements GameViewCallback {
     private DiceRollMode diceRollMode = DiceRollMode.NONE;
     private TurnPhase lastObservedPhase;
     private static final double DICE_SIZE   = 78.0;
-    private static final double DICE_X1     = 608.0;  // position of die 1 on boardPane
-    private static final double DICE_X2     = 700.0;  // position of die 2 on boardPane
+    private static final double DICE_X1     = 608.0;  
+    private static final double DICE_X2     = 700.0;  
     private static final double DICE_Y      = 868.0;
     private static final double POPUP_ASSET_WIDTH = 1048.0;
     private static final double POPUP_ASSET_HEIGHT = 753.0;
@@ -432,7 +448,7 @@ public class GameRevisionView implements GameViewCallback {
     private static final double TRADE_OFFER_RESOURCE_CARD_W = 104.0;
     private static final double TRADE_OFFER_RESOURCE_CARD_H = 146.0;
     private static final double TRADE_OFFER_RESOURCE_GAP = 16.0;
-    // Traced from Trade Offer.png lower buttons region.
+    
     private static final double TRADE_OFFER_ACTION_X_START = 49.0;
     private static final double TRADE_OFFER_ACTION_Y = 982.0;
     private static final double TRADE_OFFER_ACTION_BUTTON_W = 250.0;
@@ -453,8 +469,11 @@ public class GameRevisionView implements GameViewCallback {
     private enum InformationCloseAction {
         RETURN_TO_GAME,
         RETURN_TO_TRADE_CHOICE,
-        RETURN_TO_BANK_TRADE
+        RETURN_TO_BANK_TRADE,
+        RESUME_BOT_TURN
     }
+
+    private enum BotTradeDecision { ACCEPT, REJECT, COUNTER }
 
     private enum ResourceTypeUI {
         BANANA,
@@ -489,16 +508,17 @@ public class GameRevisionView implements GameViewCallback {
     private final PlayerTradeService playerTradeService = new PlayerTradeService();
     private TradeOverlayManager tradeOverlayManager;
     private InformationCloseAction informationCloseAction = InformationCloseAction.RETURN_TO_GAME;
+    
+    private Runnable afterBotTradeCallback = null;
     private int pendingVictoryPlayerIndex = -1;
     private boolean victoryConfirmationVisible;
     private boolean victoryDeclarationConfirmed;
     private double currentPopupLogicalWidth = POPUP_ASSET_WIDTH;
     private double currentPopupLogicalHeight = POPUP_ASSET_HEIGHT;
 
-    // ── Lifecycle ────────────────────────────────────────────────────
+  
     @FXML
     public void initialize() {
-        // Wire bridge layer — harus sebelum apapun yang butuh gameController
         gameController = GameSession.getGameController();
         if (gameController != null) {
             gameController.setUiCallback(this);
@@ -514,7 +534,7 @@ public class GameRevisionView implements GameViewCallback {
         loadPlayerNames();
         setupPlayerCardBoxes();
         renderHexBoard();
-        setupBoardLayers();    // layers ditambahkan SETELAH tiles → urutan benar
+        setupBoardLayers();  
         renderBuildingsAndPipesFromSave();
         initInventory();
         initBankStock();
@@ -751,7 +771,7 @@ public class GameRevisionView implements GameViewCallback {
         if (gameController != null) {
             try {
                 model.card.ExperimentCard card = gameController.buyExperimentCard();
-                // Engine fires onCardBought callback → refreshes inventory + stats
+                
                 syncAllPlayerStocksFromEngine();
                 initializeBankTradeResourceSnapshot();
                 return card;
@@ -760,7 +780,7 @@ public class GameRevisionView implements GameViewCallback {
                 return null;
             }
         }
-        // Fallback: no engine — update local stocks only
+        
         if (getResourceAmount(activePlayerIndex, ResourceType.ORE) < 1) return null;
         if (getResourceAmount(activePlayerIndex, ResourceType.BANANA) < 1) return null;
         if (getResourceAmount(activePlayerIndex, ResourceType.WHEAT) < 1) return null;
@@ -924,7 +944,7 @@ public class GameRevisionView implements GameViewCallback {
         else if (node instanceof Button b) b.setFont(Font.font(family, size));
     }
 
-    // ── Player names ─────────────────────────────────────────────────
+    
     private void loadPlayerNames() {
         List<String> names = GameSession.getPlayerNames();
         String[] defaults = {"Player 1", "Player 2", "Player 3", "Player 4"};
@@ -963,16 +983,16 @@ public class GameRevisionView implements GameViewCallback {
 
     public void updateTurnDisplay(String playerName) {
         turnLabel.setText(playerName.toUpperCase());
-        // Let the label grow to fit the text — prefWidth in FXML may be too narrow
+        
         turnLabel.setPrefWidth(javafx.scene.layout.Region.USE_COMPUTED_SIZE);
         turnLabel.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
     }
 
     public void updatePhaseDisplay(boolean isTrade) {
-        // phaseLabel removed — phase indicated by background image only
+        
     }
 
-    // ── Board rendering ──────────────────────────────────────────────
+    
     private void renderHexBoard() {
         SaveData loadedSaveData = GameSession.getLoadedSaveData();
 
@@ -1014,9 +1034,9 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 
-    // ── Inventory & Player Status Cards ──────────────────────────────
+    
 
-    /** Adds a small HBox to each player row Pane for their card display. */
+    
     private void setupPlayerCardBoxes() {
         Pane[] rows = {player1Row, player2Row, player3Row, player4Row};
         for (int i = 0; i < rows.length; i++) {
@@ -1032,7 +1052,7 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 
-    /** Called during initialize. Starts empty for new game; loads from SaveData if available. */
+    
     private void initInventory() {
         inventoryResourceRow.getChildren().clear();
         inventoryCardRow.getChildren().clear();
@@ -1044,13 +1064,13 @@ public class GameRevisionView implements GameViewCallback {
             for (int i = 0; i < limit; i++) {
                 SaveData.PlayerData pd = saveData.players.get(i);
                 if (i == 0) {
-                    // Active player inventory
+                    
                     refreshExperimentInventory(
                         pd.knightCardsInHand,
                         pd.progressCardsInHand,
                         pd.victoryPointCardsInHand
                     );
-                    // Load resources from save data
+                    
                     if (pd.resources != null) {
                         Map<ResourceType, Integer> resCounts = new EnumMap<>(ResourceType.class);
                         pd.resources.forEach((key, val) -> {
@@ -1070,18 +1090,18 @@ public class GameRevisionView implements GameViewCallback {
                 }
                 refreshPlayerStatusCards(i + 1, savedSpecials);
             }
-            // Populate stat labels (VP, Outpost, Lab, Knight, Pipe) for all players
+            
             populatePlayerStats(saveData);
         }
-        // Resources start empty — engine will call refreshInventory() when distributed
+        
     }
 
-    // ── Public API — called by bridge layer / GameEngineAdapter ──────
+    
 
-    /**
-     * Refresh active player's resource inventory from a Player object.
-     * Call from FX thread or wrap with Platform.runLater.
-     */
+    
+
+
+
     public void refreshInventory(Player player) {
         Map<ResourceType, Integer> counts = new EnumMap<>(ResourceType.class);
         for (ResourceType type : ResourceType.values()) {
@@ -1091,10 +1111,10 @@ public class GameRevisionView implements GameViewCallback {
         Platform.runLater(() -> refreshResourceCards(counts));
     }
 
-    /**
-     * Rebuild resource inventory row — shows only cards with count > 0,
-     * hides cards that reach 0 (traded/used).
-     */
+    
+
+
+
     public void refreshResourceCards(Map<ResourceType, Integer> counts) {
         playerResourceCounts.clear();
         playerResourceCounts.putAll(counts);
@@ -1102,14 +1122,14 @@ public class GameRevisionView implements GameViewCallback {
         rebuildCombinedInventory(counts, inventory);
     }
 
-    /**
-     * Rebuild experiment/special card row — shows only cards with count > 0.
-     * Call from FX thread or wrap with Platform.runLater.
-     */
+    
+
+
+
     public void refreshExperimentInventory(int knightCards, int progressCards, int vpCards) {
         PlayerCardInventory fallbackInventory = new PlayerCardInventory();
         fallbackInventory.setQuantity(CardType.KNIGHT, knightCards);
-        // Legacy fallback: when only "progress total" is known, render it under Road Building.
+        
         fallbackInventory.setQuantity(CardType.ROAD_BUILDING, progressCards);
         fallbackInventory.setQuantity(CardType.VICTORY_POINT, vpCards);
         rebuildCombinedInventory(playerResourceCounts, fallbackInventory);
@@ -1143,11 +1163,11 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 
-    /**
-     * Refresh card display in a player's status row (index 1-based).
-     * Shows/hides small card thumbnails based on count.
-     * Call from FX thread or wrap with Platform.runLater.
-     */
+    
+
+
+
+
     public void refreshPlayerStatusCards(int playerIndex,
                                           java.util.Collection<model.player.SpecialCard> specialCards) {
         HBox box = playerCardBoxes.get(playerIndex);
@@ -1161,7 +1181,7 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 
-    /** Small card variant for player status rows. */
+    
     private StackPane buildSmallCard(CardType type, int count) {
         CardDefinition definition = CardDefinitions.get(type);
         if (definition == null) {
@@ -1170,46 +1190,46 @@ public class GameRevisionView implements GameViewCallback {
         return cardTemplateRenderer.buildCardNode(definition, count, false, false, 42, 62);
     }
 
-    /**
-     * Resource card: inventory PNG (which already contains the full card design)
-     * overlaid with a name label at the bottom and optional pentagon badge at top-left.
-     * card.getUserData() → badge Label for count updates.
-     */
+    
+
+
+
+
     private StackPane buildResourceCard(ResourceType type, int count) {
-        // The inventory PNG is the card itself (89×139, with rounded corners)
+        
         ImageView cardImage = new ImageView(loadInventoryImage(type));
         cardImage.setFitWidth(86);
         cardImage.setFitHeight(134);
         cardImage.setPreserveRatio(false);
         cardImage.setSmooth(true);
 
-        // Name label overlaid at the bottom of the card
+        
         Label nameLabel = new Label(resourceDisplayName(type));
         nameLabel.getStyleClass().add("gr-resource-name");
         if (arcadeFont != null) nameLabel.setFont(Font.font(arcadeFont.getFamily(), 10));
-        nameLabel.setStyle("-fx-text-fill: #5b2e0a; -fx-font-weight: bold;"); // coklat
+        nameLabel.setStyle("-fx-text-fill: #5b2e0a; -fx-font-weight: bold;"); 
 
-        // Count badge — plain text, top-left, visible only when count > 1
+        
         Label badge = new Label(count > 1 ? String.valueOf(count) : "");
         badge.setVisible(count > 1);
         badge.getStyleClass().add("gr-badge-label");
         if (arcadeFont != null) badge.setFont(Font.font(arcadeFont.getFamily(), 10));
 
         StackPane root = new StackPane();
-        root.setPrefSize(86, 134);  // card size — edit here
+        root.setPrefSize(86, 134);  
         root.setMaxSize(86, 134);
 
         root.getChildren().add(cardImage);
 
-        // Name overlaid at bottom-center of card
+        
         StackPane.setAlignment(nameLabel, Pos.BOTTOM_CENTER);
         nameLabel.setStyle(nameLabel.getStyle() + " -fx-padding: 0 0 6px 0;");
         root.getChildren().add(nameLabel);
 
-        // Count text at top-left
+        
         StackPane.setAlignment(badge, Pos.TOP_LEFT);
-        badge.setTranslateX(8);  // horizontal offset from card left edge  ← geser kiri 3px (dari 5→2)
-        badge.setTranslateY(4);  // vertical offset from card top edge
+        badge.setTranslateX(8);  
+        badge.setTranslateY(4);  
         root.getChildren().add(badge);
 
         root.setUserData(badge);
@@ -1245,9 +1265,9 @@ public class GameRevisionView implements GameViewCallback {
         };
     }
 
-    // ── Info Panel (LOG / BANK) ──────────────────────────────────────
+    
 
-    /** Toggle a named panel. If already active, close it. */
+    
     private void toggleInfoPanel(String name) {
         if (activeInfoPanel.equals(name)) {
             showInfoPanel("");
@@ -1267,12 +1287,12 @@ public class GameRevisionView implements GameViewCallback {
         node.setManaged(visible);
     }
 
-    // ── LOG panel ────────────────────────────────────────────────────
+    
 
-    /**
-     * Append a log entry. Can be called from any thread.
-     * Format mirrors the backend game log.
-     */
+    
+
+
+
     public void appendLog(String message) {
         Platform.runLater(() -> {
             Label entry = new Label(message);
@@ -1280,24 +1300,24 @@ public class GameRevisionView implements GameViewCallback {
             entry.getStyleClass().add("gr-log-entry");
             if (arcadeFont != null) entry.setFont(Font.font(arcadeFont.getFamily(), 10));
             logBox.getChildren().add(entry);
-            // Auto-scroll to bottom
+            
             logScrollPane.layout();
             logScrollPane.setVvalue(1.0);
         });
     }
 
-    // ── BANK panel ───────────────────────────────────────────────────
+    
 
-    // Bank stock: starts at 19 each (ResourceBank.INITIAL_COUNT)
+    
     private final Map<ResourceType, Integer> bankStock = new EnumMap<>(ResourceType.class);
 
     private void initBankStock() {
         for (ResourceType type : ResourceType.values()) {
-            bankStock.put(type, 19); // ResourceBank.INITIAL_COUNT
+            bankStock.put(type, 19); 
         }
     }
 
-    /** Rebuild bank card row — cards with count > 0 shown, count = 0 hidden (bank ran out). */
+    
     private void buildBankCards() {
         bankCardRow.getChildren().clear();
         for (ResourceType type : ResourceType.values()) {
@@ -1308,10 +1328,10 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 
-    /**
-     * Refresh bank panel from a Bank object (model.resource.Bank).
-     * Call from FX thread or wrap with Platform.runLater.
-     */
+    
+
+
+
     public void refreshBankPanel(model.resource.Bank bank) {
         for (ResourceType type : ResourceType.values()) {
             bankStock.put(type, bank.getAvailable(type));
@@ -1321,10 +1341,10 @@ public class GameRevisionView implements GameViewCallback {
         });
     }
 
-    /**
-     * Refresh bank panel from a stock map (ResourceType → count).
-     * Useful when Bank object is not directly available.
-     */
+    
+
+
+
     public void refreshBankPanel(Map<ResourceType, Integer> stock) {
         bankStock.putAll(stock);
         Platform.runLater(() -> {
@@ -1332,7 +1352,7 @@ public class GameRevisionView implements GameViewCallback {
         });
     }
 
-    // ── Trade overlay state + flows ─────────────────────────────────
+    
     private void initializeTradeState() {
         playerResourceStocks.clear();
         ensurePlayerStockCapacity(Math.max(playerCount, 1));
@@ -1364,8 +1384,8 @@ public class GameRevisionView implements GameViewCallback {
             }
         }
 
-        // UI-first fallback for trade screen testing — only when no live engine is connected.
-        // If engine is available, sync real resource counts now
+        
+        
         if (gameController != null) {
             syncAllPlayerStocksFromEngine();
         }
@@ -1519,9 +1539,232 @@ public class GameRevisionView implements GameViewCallback {
             showBankTrade();
             return;
         }
+        if (action == InformationCloseAction.RESUME_BOT_TURN) {
+            hideTradeOverlay();
+            runAfterBotTradeCallback();
+            return;
+        }
         System.out.println("Returning to main game from Review Counter");
         hideTradeOverlay();
     }
+
+    
+
+    
+    private void runAfterBotTradeCallback() {
+        if (afterBotTradeCallback != null) {
+            Runnable cb = afterBotTradeCallback;
+            afterBotTradeCallback = null;
+            Platform.runLater(cb);
+        }
+    }
+
+    
+    private boolean isPlayerIndexBot(int index) {
+        if (gameController == null) return false;
+        List<model.player.Player> players = gameController.getAllPlayers();
+        return index >= 0 && index < players.size() && players.get(index).isBot();
+    }
+
+    
+
+
+
+
+
+    private BotTradeDecision evaluateBotTradeDecision(TradeOffer offer) {
+        if (gameController == null || offer == null) return BotTradeDecision.REJECT;
+        List<model.player.Player> all = gameController.getAllPlayers();
+        if (offer.receiverIndex < 0 || offer.receiverIndex >= all.size()) return BotTradeDecision.REJECT;
+        model.player.Player bot = all.get(offer.receiverIndex);
+
+        int totalBotGives    = offer.receive.values().stream().mapToInt(Integer::intValue).sum();
+        int totalBotReceives = offer.give.values().stream().mapToInt(Integer::intValue).sum();
+
+        if (totalBotReceives > totalBotGives) return BotTradeDecision.ACCEPT;
+
+        if (totalBotReceives < totalBotGives) {
+            
+            return buildBotCounterOffer(offer) != null ? BotTradeDecision.COUNTER : BotTradeDecision.REJECT;
+        }
+
+        
+        for (Map.Entry<ResourceType, Integer> e : offer.give.entrySet()) {
+            if (e.getValue() > 0 && bot.getResourceCount(e.getKey()) == 0) return BotTradeDecision.ACCEPT;
+        }
+        return BotTradeDecision.REJECT;
+    }
+
+    
+
+
+
+    private TradeOffer buildBotCounterOffer(TradeOffer original) {
+        if (gameController == null) return null;
+        List<model.player.Player> all = gameController.getAllPlayers();
+        if (original.receiverIndex >= all.size()) return null;
+        model.player.Player bot = all.get(original.receiverIndex);
+
+        
+        EnumMap<ResourceType, Integer> reducedGive = new EnumMap<>(original.receive);
+
+        
+        ResourceType toReduce = null;
+        int mostHeld = 0;
+        for (Map.Entry<ResourceType, Integer> e : reducedGive.entrySet()) {
+            if (e.getValue() <= 0) continue;
+            int held = bot.getResourceCount(e.getKey());
+            if (held > mostHeld) { mostHeld = held; toReduce = e.getKey(); }
+        }
+        if (toReduce == null) return null;
+
+        int newAmt = reducedGive.get(toReduce) - 1;
+        if (newAmt <= 0) reducedGive.remove(toReduce);
+        else             reducedGive.put(toReduce, newAmt);
+        if (reducedGive.isEmpty()) return null;
+
+        
+        for (Map.Entry<ResourceType, Integer> e : reducedGive.entrySet()) {
+            if (bot.getResourceCount(e.getKey()) < e.getValue()) return null;
+        }
+
+        TradeOffer counter = new TradeOffer();
+        counter.proposerIndex = original.receiverIndex; 
+        counter.receiverIndex = original.proposerIndex; 
+        counter.give.putAll(reducedGive);               
+        counter.receive.putAll(original.give);          
+        counter.counter = true;
+        return counter;
+    }
+
+    
+    private void autoBotRespondToTradeOffer() {
+        String proposerName = getPlayerNameForIndex(currentOffer.proposerIndex + 1);
+        String botName      = getPlayerNameForIndex(currentOffer.receiverIndex + 1);
+        BotTradeDecision decision = evaluateBotTradeDecision(currentOffer);
+
+        switch (decision) {
+            case ACCEPT -> {
+                if (!canExecuteOffer(currentOffer)) {
+                    clearCurrentTradeOffer(); resetTemporaryTradeState();
+                    showInformationPopup(
+                            "Trade failed. One player no longer has enough resources.",
+                            afterBotTradeCallback != null ? InformationCloseAction.RESUME_BOT_TURN
+                                                          : InformationCloseAction.RETURN_TO_GAME);
+                    return;
+                }
+                executeOffer(currentOffer);
+                syncTradeStateBackToSaveData();
+                appendLog(botName + " (bot) accepted " + proposerName + "'s trade offer.");
+                showInformationPopup(
+                        "Trade successful! " + proposerName + " traded resources with " + botName + ".",
+                        afterBotTradeCallback != null ? InformationCloseAction.RESUME_BOT_TURN
+                                                      : InformationCloseAction.RETURN_TO_GAME);
+            }
+            case COUNTER -> {
+                TradeOffer counter = buildBotCounterOffer(currentOffer);
+                if (counter != null) {
+                    currentOffer = counter;
+                    appendLog(botName + " (bot) made a counter offer to " + proposerName + ".");
+                    showReviewCounter();
+                } else {
+                    appendLog(botName + " (bot) rejected " + proposerName + "'s trade offer.");
+                    showInformationPopup("Trade offer rejected.",
+                            afterBotTradeCallback != null ? InformationCloseAction.RESUME_BOT_TURN
+                                                          : InformationCloseAction.RETURN_TO_GAME);
+                }
+            }
+            case REJECT -> {
+                appendLog(botName + " (bot) rejected " + proposerName + "'s trade offer.");
+                showInformationPopup("Trade offer rejected.",
+                        afterBotTradeCallback != null ? InformationCloseAction.RESUME_BOT_TURN
+                                                      : InformationCloseAction.RETURN_TO_GAME);
+            }
+        }
+    }
+
+    
+    private void autoBotRespondToCounterOffer() {
+        String counterProposerName = getPlayerNameForIndex(currentOffer.proposerIndex + 1);
+        String botName             = getPlayerNameForIndex(currentOffer.receiverIndex + 1);
+
+        InformationCloseAction closeAction = afterBotTradeCallback != null
+                ? InformationCloseAction.RESUME_BOT_TURN
+                : InformationCloseAction.RETURN_TO_GAME;
+
+        if (!canExecuteOffer(currentOffer)) {
+            clearCurrentTradeOffer(); resetTemporaryTradeState();
+            showInformationPopup(
+                    "Counter trade failed. One player no longer has enough resources.", closeAction);
+            return;
+        }
+
+        
+        BotTradeDecision decision = evaluateBotTradeDecision(currentOffer);
+        if (decision == BotTradeDecision.ACCEPT) {
+            executeOffer(currentOffer);
+            syncTradeStateBackToSaveData();
+            appendLog(botName + " (bot) accepted " + counterProposerName + "'s counter offer.");
+            clearCurrentTradeOffer(); resetTemporaryTradeState();
+            showInformationPopup(
+                    "Counter trade successful! " + counterProposerName + " traded with " + botName + ".",
+                    closeAction);
+        } else {
+            appendLog(botName + " (bot) rejected " + counterProposerName + "'s counter offer.");
+            clearCurrentTradeOffer(); resetTemporaryTradeState();
+            showInformationPopup("Counter offer rejected.", closeAction);
+        }
+    }
+
+    
+
+
+
+
+    private void showBotInitiatedTradeReview() {
+        if (currentOffer == null) { runAfterBotTradeCallback(); return; }
+
+        showTradeOverlayBase(TRADE_OFFER_IMAGE_PATH, TradeMode.TRADE_OFFER_REVIEW);
+        tradeUiPane.getChildren().clear();
+
+        double scaleX = currentPopupLogicalWidth / TRADE_OFFER_ASSET_WIDTH;
+        double scaleY = currentPopupLogicalHeight / TRADE_OFFER_ASSET_HEIGHT;
+
+        tradeUiPane.getChildren().add(createTradeOfferFromCard(currentOffer.proposerIndex, scaleX, scaleY));
+        tradeUiPane.getChildren().add(createTradeOfferResourceRow(
+                currentOffer.give, TRADE_OFFER_GIVE_ROW_X * scaleX, TRADE_OFFER_GIVE_ROW_Y * scaleY, scaleX, scaleY));
+        tradeUiPane.getChildren().add(createTradeOfferResourceRow(
+                currentOffer.receive, TRADE_OFFER_WANT_ROW_X * scaleX, TRADE_OFFER_WANT_ROW_Y * scaleY, scaleX, scaleY));
+        tradeUiPane.toFront();
+
+        String botName   = getPlayerNameForIndex(currentOffer.proposerIndex + 1);
+        String humanName = getPlayerNameForIndex(currentOffer.receiverIndex + 1);
+
+        Runnable onReject = () -> {
+            appendLog(humanName + " rejected " + botName + " (bot)'s trade offer.");
+            clearCurrentTradeOffer(); resetTemporaryTradeState();
+            showInformationPopup("Trade offer rejected.", InformationCloseAction.RESUME_BOT_TURN);
+        };
+        Runnable onAccept = () -> {
+            if (!canExecuteOffer(currentOffer)) {
+                clearCurrentTradeOffer(); resetTemporaryTradeState();
+                showInformationPopup(
+                        "Trade failed. One player no longer has enough resources.",
+                        InformationCloseAction.RESUME_BOT_TURN);
+                return;
+            }
+            executeOffer(currentOffer);
+            syncTradeStateBackToSaveData();
+            appendLog(humanName + " accepted " + botName + " (bot)'s trade offer.");
+            showInformationPopup("Trade successful!", InformationCloseAction.RESUME_BOT_TURN);
+        };
+        
+        
+        Runnable onCounter = this::showCounterOffer;
+        renderTradeOfferBottomButtons(onReject, onAccept, onCounter);
+    }
+
+    
 
     private void clearTradeError() {
         tradeErrorLabel.setText("");
@@ -2445,6 +2688,11 @@ public class GameRevisionView implements GameViewCallback {
             showTradeChoice();
             return;
         }
+        
+        if (isPlayerIndexBot(currentOffer.receiverIndex)) {
+            autoBotRespondToTradeOffer();
+            return;
+        }
         System.out.println("Trade Offer opened");
 
         showTradeOverlayBase(TRADE_OFFER_IMAGE_PATH, TradeMode.TRADE_OFFER_REVIEW);
@@ -2932,6 +3180,11 @@ public class GameRevisionView implements GameViewCallback {
             showTradeChoice();
             return;
         }
+        
+        if (isPlayerIndexBot(currentOffer.receiverIndex)) {
+            autoBotRespondToCounterOffer();
+            return;
+        }
         System.out.println("Review Counter opened");
 
         showTradeOverlayBase(TRADE_REVIEW_COUNTER_IMAGE_PATH, TradeMode.REVIEW_COUNTER);
@@ -3100,7 +3353,7 @@ public class GameRevisionView implements GameViewCallback {
     private void showBankTrade() {
         System.out.println("[TradeUI] showBankTrade called");
         showTradeOverlayBase(TRADE_BANK_IMAGE_PATH, TradeMode.BANK_TRADE);
-        setBankTradeControlsVisible(false); // old static controls are intentionally disabled.
+        setBankTradeControlsVisible(false); 
         setBankTradeActionButtonsVisible(true);
         renderBankTradeDynamicUi();
         showBankTradeMessage("", false);
@@ -3435,7 +3688,7 @@ public class GameRevisionView implements GameViewCallback {
         ResourceType give    = toModelResource(selectedPlayerGiveResourceUi);
         ResourceType receive = toModelResource(selectedBankReceiveResourceUi);
 
-        // Update live engine if available; otherwise update local stocks only
+        
         if (gameController != null && give != null && receive != null) {
             try {
                 model.player.Player activePlayer = gameController.getActivePlayer();
@@ -4011,7 +4264,7 @@ public class GameRevisionView implements GameViewCallback {
 
     private void executeOffer(TradeOffer offer) {
         if (gameController != null) {
-            // Update engine player objects directly; sync local stocks from engine afterward
+            
             List<model.player.Player> allPlayers = gameController.getAllPlayers();
             for (ResourceType resourceType : TRADE_RESOURCE_ORDER) {
                 int giveValue    = offer.give.getOrDefault(resourceType, 0);
@@ -4041,7 +4294,7 @@ public class GameRevisionView implements GameViewCallback {
             initializeBankTradeResourceSnapshot();
             refreshInventoryForPlayerIndex(activePlayerIndex);
         } else {
-            // No engine – update local stocks only
+            
             for (ResourceType resourceType : TRADE_RESOURCE_ORDER) {
                 int giveValue    = offer.give.getOrDefault(resourceType, 0);
                 int receiveValue = offer.receive.getOrDefault(resourceType, 0);
@@ -4058,12 +4311,12 @@ public class GameRevisionView implements GameViewCallback {
         syncTradeStateBackToSaveData();
     }
 
-    // ── Timer ────────────────────────────────────────────────────────
+    
 
-    /**
-     * Start (or restart) the turn countdown timer.
-     * Called automatically at turn start and by bridge layer.
-     */
+    
+
+
+
     public void startTurnTimer(int seconds) {
         stopTimer();
         remainingSeconds = seconds;
@@ -4103,12 +4356,12 @@ public class GameRevisionView implements GameViewCallback {
         timerLabel.setText(String.format("%02d:%02d", m, s));
     }
 
-    // ── Auto-roll countdown ──────────────────────────────────────────
+    
 
-    /**
-     * Mulai countdown AUTO_ROLL_SECONDS. Jika pemain belum roll dalam waktu itu,
-     * dadu dilempar otomatis.
-     */
+    
+
+
+
     private void startAutoRollCountdown() {
         stopAutoRollCountdown();
         autoRollTimeline = new Timeline(
@@ -4130,13 +4383,13 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 
-    // ── Dice ─────────────────────────────────────────────────────────
+    
 
     private void startDiceAnimation() {
         setupDiceViews();
         diceRolled = true;
 
-        // 80 ms per frame × 25 frames ≈ 2 seconds of animation
+        
         diceTimeline = new Timeline(new KeyFrame(Duration.millis(80), e -> {
             if (diceView1 != null) diceView1.setImage(loadDiceImage(randomFace()));
             if (diceView2 != null) diceView2.setImage(loadDiceImage(randomFace()));
@@ -4206,8 +4459,8 @@ public class GameRevisionView implements GameViewCallback {
     private void finalizeDiceRoll() {
         diceRolled = true;
         if (gameController != null) {
-            // Engine rollDice() → fires onDiceRolled() callback → updates dice visuals + log
-            // Engine juga fires onPhaseChanged(ROBBER_DISCARD / TRADE_BUILD) → handles rest
+            
+            
             try {
                 gameController.rollDice();
             } catch (Exception e) {
@@ -4218,12 +4471,12 @@ public class GameRevisionView implements GameViewCallback {
                         InformationCloseAction.RETURN_TO_GAME);
             }
         } else {
-            // Tidak ada engine → UI-only fallback
+            
             applyDiceRollUIFallback();
         }
     }
 
-    /** Fallback saat tidak ada engine yang terhubung. */
+    
     private void applyDiceRollUIFallback() {
         int f1 = randomFace();
         int f2 = randomFace();
@@ -4280,9 +4533,9 @@ public class GameRevisionView implements GameViewCallback {
         return new Image(getClass().getResource(path).toExternalForm());
     }
 
-    // ── End Turn ─────────────────────────────────────────────────────
+    
 
-    /** Core end-turn logic: stop timer, clear state, advance player, restart timer. */
+    
     private void performEndTurn() {
         stopTimer();
         stopAutoRollCountdown();
@@ -4308,7 +4561,7 @@ public class GameRevisionView implements GameViewCallback {
         updateTurnDisplay(nextName);
         updatePhaseDisplay(false);
 
-        // Load next player's resources from playerResourceStocks
+        
         refreshInventoryForPlayerIndex(activePlayerIndex);
 
         appendLog("─── Giliran " + nextName + " ───");
@@ -4323,31 +4576,31 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 
-    /** Load and display inventory for a given player index. Prefers live engine data. */
+    
     private void refreshInventoryForPlayerIndex(int idx) {
         if (gameController != null) {
             List<model.player.Player> allPlayers = gameController.getAllPlayers();
             if (idx >= 0 && idx < allPlayers.size()) {
                 model.player.Player p = allPlayers.get(idx);
-                // Sync this player's stock into local map
+                
                 ensurePlayerStockCapacity(idx + 1);
                 EnumMap<ResourceType, Integer> stock = playerResourceStocks.get(idx);
                 for (ResourceType type : ResourceType.values()) {
                     stock.put(type, p.getResourceCount(type));
                 }
-                // Display resources from engine
+                
                 Map<ResourceType, Integer> nonZero = new EnumMap<>(ResourceType.class);
                 stock.forEach((k, v) -> { if (v > 0) nonZero.put(k, v); });
                 playerResourceCounts.clear();
                 playerResourceCounts.putAll(nonZero);
                 refreshResourceCards(nonZero);
-                // Display cards from engine
+                
                 syncCardInventoriesFromEngine();
                 refreshExperimentInventoryFromCardInventory(idx);
                 return;
             }
         }
-        // Fallback: local stock
+        
         if (idx < playerResourceStocks.size()) {
             EnumMap<ResourceType, Integer> stock = playerResourceStocks.get(idx);
             Map<ResourceType, Integer> nonZero = new EnumMap<>(ResourceType.class);
@@ -4359,7 +4612,7 @@ public class GameRevisionView implements GameViewCallback {
             inventoryResourceRow.getChildren().clear();
             resourceBadgeLabels.clear();
         }
-        // Experiment cards from save data
+        
         SaveData saveData = GameSession.getLoadedSaveData();
         if (saveData != null && saveData.players != null && idx < saveData.players.size()) {
             SaveData.PlayerData pd = saveData.players.get(idx);
@@ -4373,11 +4626,11 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 
-    /**
-     * Reads all player resource counts from the live engine and writes them into
-     * {@code playerResourceStocks} and {@code bankStock}.  Must be called on the FX thread
-     * (or wrapped in Platform.runLater) because it may update UI-backing maps.
-     */
+    
+
+
+
+
     private void syncAllPlayerStocksFromEngine() {
         if (gameController == null) return;
         List<model.player.Player> allPlayers = gameController.getAllPlayers();
@@ -4389,7 +4642,7 @@ public class GameRevisionView implements GameViewCallback {
                 stock.put(type, p.getResourceCount(type));
             }
         }
-        // Sync bank stock
+        
         model.resource.Bank bank = gameController.getBank();
         for (ResourceType type : ResourceType.values()) {
             bankStock.put(type, bank.getAvailable(type));
@@ -4399,7 +4652,7 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 
-    /** Fill VP / Outpost / Lab / Knight / Pipe stat labels from SaveData for all players. */
+    
     private void populatePlayerStats(SaveData saveData) {
         if (saveData == null || saveData.players == null) return;
         Label[][] labels = {
@@ -4432,12 +4685,12 @@ public class GameRevisionView implements GameViewCallback {
             if (row[3] != null) row[3].setText(String.valueOf(knight));
             if (row[4] != null) row[4].setText(String.valueOf(pipes));
 
-            // Store VP so declare-victory can check it
+            
             playerVictoryPointsCache[i] = vp;
         }
     }
 
-    // Cached VP per player (updated by populatePlayerStats)
+    
     private final int[] playerVictoryPointsCache = new int[4];
     private static final int VICTORY_THRESHOLD = 10;
 
@@ -4446,14 +4699,14 @@ public class GameRevisionView implements GameViewCallback {
         return playerVictoryPointsCache[activePlayerIndex];
     }
 
-    // ── Layer management ─────────────────────────────────────────────
+    
 
-    /**
-     * Adds the 3 z-order layers on top of tile images.
-     * Order (bottom to top): circleLayer → pipeLayer → buildingLayer
-     * All layers are transparent with pickOnBounds=false so empty areas
-     * don't intercept mouse events destined for FXML elements.
-     */
+    
+
+
+
+
+
     private void setupBoardLayers() {
         for (Pane layer : new Pane[]{circleLayer, pipeLayer, buildingLayer}) {
             layer.setPickOnBounds(false);
@@ -4461,35 +4714,37 @@ public class GameRevisionView implements GameViewCallback {
             layer.prefWidthProperty().bind(boardPane.prefWidthProperty());
             layer.prefHeightProperty().bind(boardPane.prefHeightProperty());
         }
-        // Pipes and buildings don't need to receive clicks
+        
         pipeLayer.setMouseTransparent(true);
         buildingLayer.setMouseTransparent(true);
-        // Hanya tambahkan jika belum ada — mencegah duplicate children exception
+        
         if (!boardPane.getChildren().contains(circleLayer)) {
             boardPane.getChildren().addAll(circleLayer, pipeLayer, buildingLayer);
         }
     }
 
-    // ── Build mode ───────────────────────────────────────────────────
+    
 
-    /**
-     * Called during initialize: jika save data menunjukkan fase TRADE_BUILD,
-     * tampilkan semua lokasi yang bisa dibangun berdasarkan data board.
-     * Ini untuk keperluan testing UI — bridge layer akan menggantikan ini
-     * dengan data validasi nyata dari GameEngine.
-     */
+    
+
+
+
+
+
     private void tryAutoEnterBuildMode() {
         if (currentBoard == null) return;
+        if (gameController != null && gameController.getActivePlayer() != null
+                && gameController.getActivePlayer().isBot()) return;
 
         Set<Integer> settlementIds;
         Set<Integer> labIds;
         Set<Integer> pipeIds;
 
         if (gameController != null) {
-            // ── Pakai BuildValidator via bridge — validasi nyata dari engine ──
+            
             TurnPhase phase = gameController.getCurrentPhase();
 
-            // Road Building card played before rolling dice: show pipes only
+            
             if (phase == TurnPhase.ROLL_DICE && gameController.getFreeRoadsRemaining() > 0) {
                 Player activePlayer = gameController.getActivePlayer();
                 Set<Integer> freePipeIds = gameController.getValidPipeIds(activePlayer);
@@ -4508,7 +4763,7 @@ public class GameRevisionView implements GameViewCallback {
             labIds        = gameController.getValidLabIds(activePlayer);
             pipeIds       = gameController.getValidPipeIds(activePlayer);
         } else {
-            // ── Fallback offline: pakai semua lokasi kosong (tanpa validasi) ──
+            
             settlementIds = new HashSet<>();
             labIds        = new HashSet<>();
             for (Intersection inter : currentBoard.getAllIntersections()) {
@@ -4537,20 +4792,20 @@ public class GameRevisionView implements GameViewCallback {
         enterBuildMode(settlementIds, labIds, pipeIds, currentBoard);
     }
 
-    /**
-     * Shows red circles on all valid build locations for the current player.
-     * Called by the bridge layer when it's the player's TRADE_BUILD phase.
-     *
-     * @param settlementIds  intersections where a new outpost can be placed
-     * @param labIds         intersections where an existing outpost can be upgraded to lab
-     * @param pipeIds        path IDs where a pipe can be placed
-     * @param board          current board state
-     */
+    
+
+
+
+
+
+
+
+
     public void enterBuildMode(Set<Integer> settlementIds,
                                 Set<Integer> labIds,
                                 Set<Integer> pipeIds,
                                 Board board) {
-        // Circles go into circleLayer (bottom layer), always below pipes and buildings
+        
         hexRevisionRenderer.renderBuildableLocations(
             circleLayer, settlementIds, labIds, pipeIds, board,
             this::onIntersectionCircleClicked,
@@ -4558,7 +4813,7 @@ public class GameRevisionView implements GameViewCallback {
         );
     }
 
-    /** Removes all build circles and closes any open build popup. */
+    
     public void exitBuildMode() {
         hexRevisionRenderer.clearBuildableLocations(circleLayer);
         hideBuildPopup();
@@ -4568,14 +4823,14 @@ public class GameRevisionView implements GameViewCallback {
 
     private static final String ROBBER_ZONE_TAG = "robber-move-zone";
 
-    /** Overlays clickable highlight circles on all tiles except the current robber position. */
+    
     private void enterRobberMoveMode() {
         if (currentBoard == null || gameController == null) {
             appendLog("[DEBUG] enterRobberMoveMode: board or controller null");
             return;
         }
         try {
-        exitRobberMoveMode(); // clear any previous zones
+        exitRobberMoveMode(); 
         HexCoordinate currentRobberPos = gameController.getRobberPosition();
 
         for (model.board.HexTile tile : currentBoard.getAllTiles()) {
@@ -4611,7 +4866,7 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 
-    /** Removes robber-move highlight circles. */
+    
     private void exitRobberMoveMode() {
         circleLayer.getChildren().removeIf(n -> ROBBER_ZONE_TAG.equals(n.getUserData()));
     }
@@ -4636,7 +4891,7 @@ public class GameRevisionView implements GameViewCallback {
         popup.setVisible(true);
         popup.setManaged(true);
         popup.toFront();
-        // Pre-highlight based on current build type
+        
         if (!isPipe) {
             if (pendingBuildType == BuildType.LAB)    applyBuildingHighlight("lab");
             else                                       applyBuildingHighlight("outpost");
@@ -4674,13 +4929,13 @@ public class GameRevisionView implements GameViewCallback {
         pendingBuildId   = -1;
     }
 
-    /**
-     * Called when the BUILD button inside a popup is clicked.
-     * For building popup: requires a selection (lab/outpost) first.
-     */
+    
+
+
+
     @FXML
     public void onBuildConfirmed() {
-        // Building popup: must select type first
+        
         if (pendingBuildType == BuildType.OUTPOST || pendingBuildType == BuildType.LAB) {
             if (pendingBuildingSubType == null) {
                 showBuildingSelectError();
@@ -4692,13 +4947,13 @@ public class GameRevisionView implements GameViewCallback {
     }
 
     private void showBuildingSelectError() {
-        showCenteredWarning("Klik icon bangunan terlebih dahulu", 1500, "#5b2e0a"); // coklat
+        showCenteredWarning("Klik icon bangunan terlebih dahulu", 1500, "#5b2e0a"); 
     }
 
     private void performActualBuild() {
         BuildType confirmedBuildType = pendingBuildType;
         if (gameController != null) {
-            // ── Sambungkan ke engine — engine akan fire onBuildingPlaced/onPipePlaced ──
+            
             try {
                 if (isInitialSetupPhase() && confirmedBuildType == BuildType.LAB) {
                     showInformationPopup("Complete initial setup first.", InformationCloseAction.RETURN_TO_GAME);
@@ -4712,7 +4967,7 @@ public class GameRevisionView implements GameViewCallback {
                         TurnPhase phase = gameController.getCurrentPhase();
                         if (phase == TurnPhase.SETUP_PLACE_FIRST
                             || phase == TurnPhase.SETUP_PLACE_SECOND) {
-                            // Setup pipe harus menyentuh settlement yang baru saja ditempatkan
+                            
                             gameController.buildPipeSetup(pendingBuildId, setupLastSettlementId);
                         } else {
                             gameController.buildPipe(pendingBuildId);
@@ -4720,7 +4975,7 @@ public class GameRevisionView implements GameViewCallback {
                     }
                     default -> {}
                 }
-                // Jangan render manual — engine akan fire onBuildingPlaced/onPipePlaced
+                
             } catch (Exception e) {
                 String friendlyMessage = mapBuildErrorMessage(e.getMessage());
                 appendLog("Build gagal: " + friendlyMessage);
@@ -4729,7 +4984,7 @@ public class GameRevisionView implements GameViewCallback {
                 return;
             }
         } else {
-            // ── Fallback offline — render manual ──────────────────────────
+            
             String colorName = getPlayerColorName(activePlayerIndex);
             switch (pendingBuildType) {
                 case OUTPOST -> { renderBuildingOnMap(pendingBuildId, "pos", colorName);
@@ -4777,9 +5032,9 @@ public class GameRevisionView implements GameViewCallback {
         return rawMessage;
     }
 
-    // ── Restore buildings & pipes dari save data ─────────────────────
+    
 
-    /** Dipanggil saat initialize — render semua bangunan & pipe dari SaveData. */
+    
     private void renderBuildingsAndPipesFromSave() {
         SaveData saveData = GameSession.getLoadedSaveData();
         if (saveData == null || saveData.players == null) return;
@@ -4788,7 +5043,7 @@ public class GameRevisionView implements GameViewCallback {
             SaveData.PlayerData pd = saveData.players.get(i);
             String colorName = (pd.color != null) ? pd.color.toLowerCase() : getPlayerColorName(i);
 
-            // Render bangunan (outpost / lab)
+            
             if (pd.buildings != null) {
                 for (SaveData.BuildingData bd : pd.buildings) {
                     String type = "LABORATORY".equalsIgnoreCase(bd.buildingType) ? "lab" : "pos";
@@ -4796,7 +5051,7 @@ public class GameRevisionView implements GameViewCallback {
                 }
             }
 
-            // Render pipe
+            
             if (pd.pipePathIds != null) {
                 for (int pathId : pd.pipePathIds) {
                     renderPipeOnMap(pathId, i);
@@ -4805,7 +5060,7 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 
-    // ── Building / pipe rendering ─────────────────────────────────────
+    
 
     private static final String BUILT_TAG = "built-structure";
     private static final double PIPE_THICKNESS = 14.0;
@@ -4820,7 +5075,7 @@ public class GameRevisionView implements GameViewCallback {
 
         String path = "/com/bananarepublic/images/game_revision/" + type + "_" + colorName + ".png";
         Image img = new Image(getClass().getResource(path).toExternalForm());
-        double scale = "pos".equals(type) ? 1.5 : 0.75; // pos 1.5x, lab 3/4
+        double scale = "pos".equals(type) ? 1.5 : 0.75; 
         double w = img.getWidth()  * scale;
         double h = img.getHeight() * scale;
         ImageView iv = new ImageView(img);
@@ -4830,7 +5085,7 @@ public class GameRevisionView implements GameViewCallback {
         iv.setLayoutX(pos.x() - w / 2.0);
         iv.setLayoutY(pos.y() - h / 2.0);
         iv.setUserData(BUILT_TAG);
-        buildingLayer.getChildren().add(iv); // top layer → always above pipes and circles
+        buildingLayer.getChildren().add(iv); 
     }
 
     private void renderPipeOnMap(int pathId, int playerIdx) {
@@ -4871,7 +5126,7 @@ public class GameRevisionView implements GameViewCallback {
         pipe.setRotate(angle);
         pipe.setUserData(BUILT_TAG);
         pipeLayer.getChildren().add(pipeOutline);
-        pipeLayer.getChildren().add(pipe); // middle layer → above circles, below buildings
+        pipeLayer.getChildren().add(pipe); 
     }
 
     private String getPlayerColorName(int idx) {
@@ -4909,7 +5164,7 @@ public class GameRevisionView implements GameViewCallback {
         };
     }
 
-    // ── Popup ────────────────────────────────────────────────────────
+    
     private void hidePopup() {
         if (tradeOverlayRoot != null) {
             tradeOverlayRoot.setVisible(false);
@@ -5211,7 +5466,7 @@ public class GameRevisionView implements GameViewCallback {
         System.out.println("[TradeUI] scale: " + scale);
     }
 
-    // ── Button handlers ──────────────────────────────────────────────`r`n    @FXML
+    
         @FXML
     private void onDiceButtonMouseClicked(MouseEvent event) {
         if (!ensureDiceRollAllowed()) {
@@ -5240,22 +5495,27 @@ public class GameRevisionView implements GameViewCallback {
         rollDiceRandom();
     }
 
-    // ── GameUICallback implementation ────────────────────────────────
-    // Semua dipanggil dari GameController.Platform.runLater() → FX thread aman
+    
+    
 
     @Override
     public void onPhaseChanged(TurnPhase newPhase) {
         TurnPhase previousPhase = lastObservedPhase;
         lastObservedPhase = newPhase;
+        boolean _activeIsBot = gameController != null && gameController.getActivePlayer() != null
+                && gameController.getActivePlayer().isBot();
         if (diceButton != null) {
-            diceButton.setDisable(newPhase != TurnPhase.ROLL_DICE);
+            diceButton.setDisable(newPhase != TurnPhase.ROLL_DICE || _activeIsBot);
         }
 
         switch (newPhase) {
             case ROLL_DICE -> {
-                // Timer mulai dari awal giliran (bukan hanya setelah dice dilempar)
-                startTurnTimer(DEFAULT_TURN_SECONDS);
-                startAutoRollCountdown();          // auto-roll jika 10 detik tidak roll
+                if (_activeIsBot) {
+                    stopTimer(); 
+                } else {
+                    startTurnTimer(DEFAULT_TURN_SECONDS);
+                    startAutoRollCountdown();
+                }
                 updatePhaseDisplay(false);
                 diceRolled = false;
                 diceRollMode = DiceRollMode.NONE;
@@ -5276,13 +5536,15 @@ public class GameRevisionView implements GameViewCallback {
             }
             case TRADE_BUILD -> {
                 updatePhaseDisplay(true);
-                stopAutoRollCountdown(); // dice sudah dilempar, batalkan auto-roll
+                stopAutoRollCountdown();
                 exitRobberMoveMode();
-                tryAutoEnterBuildMode();
-                // Timer sudah berjalan sejak ROLL_DICE untuk kasus normal.
-                // Jika dice=7, timer dihentikan di ROBBER_DISCARD — restart di sini.
-                if (timerTimeline == null) {
-                    startTurnTimer(DEFAULT_TURN_SECONDS);
+                if (_activeIsBot) {
+                    stopTimer(); 
+                } else {
+                    tryAutoEnterBuildMode();
+                    if (timerTimeline == null) {
+                        startTurnTimer(DEFAULT_TURN_SECONDS);
+                    }
                 }
             }
             case ROBBER_DISCARD -> {
@@ -5328,7 +5590,7 @@ public class GameRevisionView implements GameViewCallback {
 
     @Override
     public void onDiceRolled(DiceResult result) {
-        // Update visual dadu dengan hasil nyata dari engine
+        
         if (diceView1 != null) diceView1.setImage(loadDiceImage(result.getDie1()));
         if (diceView2 != null) diceView2.setImage(loadDiceImage(result.getDie2()));
         appendLog("🎲 " + result.getDie1() + " + " + result.getDie2()
@@ -5338,7 +5600,7 @@ public class GameRevisionView implements GameViewCallback {
 
     @Override
     public void onTurnChanged(Player newActivePlayer) {
-        // Sembunyikan dadu saat giliran berganti — muncul lagi hanya saat roll dipencet
+        
         clearDiceDisplay();
         diceRolled = false;
         diceRollMode = DiceRollMode.NONE;
@@ -5364,7 +5626,7 @@ public class GameRevisionView implements GameViewCallback {
         String type = buildingType.toLowerCase().contains("lab") ? "lab" : "pos";
         renderBuildingOnMap(intersectionId, type, colorName);
         refreshPlayerStatsAll();
-        // Sync inventory — resources sudah terpotong oleh engine
+        
         if (gameController != null) {
             syncAllPlayerStocksFromEngine();
             refreshInventoryForPlayerIndex(activePlayerIndex);
@@ -5409,15 +5671,15 @@ public class GameRevisionView implements GameViewCallback {
         if (currentBoard != null) {
             hexRevisionRenderer.render(boardPane,
                 currentBoard.getAllTiles(), newPosition, currentBoard);
-            // render() appends tiles ke akhir boardPane → circleLayer jadi di belakang tiles
-            // Kembalikan layers ke paling depan agar circles tetap terlihat di atas tiles
+            
+            
             bringLayersToFront();
         }
         appendLog("⚫ Nimon Ungu dipindah.");
         showStealDialogIfNeeded();
     }
 
-    /** Pindahkan semua overlay layers ke akhir boardPane (z-order paling atas). */
+    
     private void bringLayersToFront() {
         circleLayer.toFront();
         pipeLayer.toFront();
@@ -5426,14 +5688,14 @@ public class GameRevisionView implements GameViewCallback {
 
     private void showStealDialogIfNeeded() {
         if (gameController == null) return;
-        // Popup selalu muncul setelah robber dipindah, meskipun tidak ada kandidat
+        
         List<model.player.Player> candidates = gameController.getStealCandidates();
-        showStealDialog(candidates); // candidates bisa kosong → popup tetap muncul, user tinggal tutup X
+        showStealDialog(candidates); 
     }
 
     private void showStealDialog(List<model.player.Player> candidates) {
-        // Resource Theft popup — pakai Resource theft.png background
-        // Tidak ada tombol X — CONFIRM selalu di bawah frame popup
+        
+        
         boolean hasCandidates = !candidates.isEmpty();
         double popupW = 1048, popupH = 753;
         double popupX = (DESIGN_WIDTH  - popupW) / 2.0;
@@ -5454,7 +5716,7 @@ public class GameRevisionView implements GameViewCallback {
         bg.setFitWidth(popupW); bg.setFitHeight(popupH); bg.setPreserveRatio(false);
         popup.getChildren().add(bg);
 
-        // Player candidate cards
+        
         List<model.player.Player> allPlayers = gameController != null
             ? gameController.getAllPlayers() : candidates;
         java.util.Set<String> candidateNames = new java.util.HashSet<>();
@@ -5479,13 +5741,13 @@ public class GameRevisionView implements GameViewCallback {
         };
         List<VBox> cardViews = new ArrayList<>();
 
-        // CONFIRM button dideklarasikan dulu agar bisa di-enable/disable dari click handler
+        
         Button confirmBtn = new Button();
         confirmBtn.setLayoutX(802); confirmBtn.setLayoutY(643);
         confirmBtn.setPrefWidth(215); confirmBtn.setPrefHeight(70);
-        // Jika tidak ada kandidat: langsung aktif; jika ada kandidat: tunggu pilihan
+        
         confirmBtn.setOpacity(hasCandidates ? 0.0 : 0.0);
-        confirmBtn.setDisable(hasCandidates); // disabled sampai player dipilih
+        confirmBtn.setDisable(hasCandidates); 
         confirmBtn.getStyleClass().add("transparent-click-zone");
 
         for (int i = 0; i < allPlayers.size(); i++) {
@@ -5525,9 +5787,9 @@ public class GameRevisionView implements GameViewCallback {
                 final model.player.Player pFinal = p;
                 card.setOnMouseClicked(ev -> {
                     selected[0] = pFinal;
-                    // Aktifkan CONFIRM setelah pemain dipilih
+                    
                     confirmBtn.setDisable(false);
-                    // Update highlight kartu
+                    
                     for (VBox cv : cardViews) {
                         String cName = (String) cv.getUserData();
                         boolean cIsCandidate = cName != null && candidateNames.contains(cName)
@@ -5543,7 +5805,7 @@ public class GameRevisionView implements GameViewCallback {
         }
         popup.getChildren().add(cardRow);
 
-        // Hint label
+        
         Label hintLabel = new Label(hasCandidates
             ? "Pilih pemain untuk diambil resource-nya"
             : "Tidak ada pemain di area robber — klik CONFIRM untuk lanjut");
@@ -5553,20 +5815,20 @@ public class GameRevisionView implements GameViewCallback {
         if (arcadeFont != null) hintLabel.setFont(Font.font(arcadeFont.getFamily(), 10));
         popup.getChildren().add(hintLabel);
 
-        // CONFIRM button — aktif langsung jika tidak ada kandidat, aktif setelah pilih jika ada
+        
         confirmBtn.setOnAction(ev -> {
             designPane.getChildren().remove(overlay);
             if (selected[0] != null) {
                 try {
                     gameController.stealFromPlayer(selected[0]);
-                    // onResourceStolen callback → update inventory
+                    
                 } catch (Exception ex) {
                     appendLog("Steal gagal: " + ex.getMessage());
                 }
             } else {
                 appendLog("Tidak ada pencurian resource.");
             }
-            // Program lanjut ke phase build — engine sudah di TRADE_BUILD setelah moveRobber
+            
         });
         popup.getChildren().add(confirmBtn);
 
@@ -5640,10 +5902,10 @@ public class GameRevisionView implements GameViewCallback {
 
     @Override
     public void onTimerTick(int secondsRemaining) {
-        // UI timer (dimulai sejak ROLL_DICE) yang mengelola tampilan.
-        // Engine timer baru mulai setelah TRADE_BUILD (sesudah dice diroll),
-        // sehingga nilainya lebih besar dan akan menyebabkan timer "reset" jika dipakai.
-        // Abaikan — engine tetap menangani onTimerExpired saat waktu habis.
+        
+        
+        
+        
     }
 
     @Override
@@ -5657,7 +5919,18 @@ public class GameRevisionView implements GameViewCallback {
         showDeclareVictoryConfirmationPopup(getAllPlayerIndex(winner));
     }
 
-    // ── Helpers untuk GameUICallback ─────────────────────────────────
+    @Override
+    public void onBotPlayerTradeProposed(com.bananarepublic.trade.TradeOffer offer) {
+        
+        
+        currentOffer = offer;
+        afterBotTradeCallback = () -> {
+            if (gameController != null) gameController.resumeBotTurnAfterTrade();
+        };
+        showBotInitiatedTradeReview();
+    }
+
+    
 
     private int getAllPlayerIndex(Player player) {
         if (gameController == null) return 0;
@@ -5714,7 +5987,7 @@ public class GameRevisionView implements GameViewCallback {
         }
     }
 
-    /** Setup mode saat fase SETUP — intersection dulu (distance rule berlaku). */
+    
     private void enterSetupIntersectionMode() {
         if (gameController == null || currentBoard == null) return;
         Player p = gameController.getActivePlayer();
@@ -5725,7 +5998,7 @@ public class GameRevisionView implements GameViewCallback {
         appendLog(p.getName() + ": place your " + (firstRound ? "first" : "second") + " Watch Post.");
     }
 
-    /** Setup pipe mode — hanya path adjacent ke settlement yang baru ditempatkan. */
+    
     private void enterSetupPipeMode(int adjacentIntersectionId) {
         if (gameController == null || currentBoard == null) return;
         Player p = gameController.getActivePlayer();
@@ -5737,7 +6010,7 @@ public class GameRevisionView implements GameViewCallback {
                 + (firstRound ? "first" : "second") + " Watch Post.");
     }
 
-    /** Discard sequence — loop SEMUA player dengan >7 kartu. */
+    
     private java.util.Deque<model.player.Player> discardQueue = new java.util.ArrayDeque<>();
 
     private void openDiscardDialogSequence() {
@@ -5745,10 +6018,10 @@ public class GameRevisionView implements GameViewCallback {
         discardQueue = new java.util.ArrayDeque<>(gameController.getPlayersRequiredToDiscard());
         appendLog("[Robber] Players to discard: " + discardQueue.size());
         if (discardQueue.isEmpty()) {
-            // Nobody has >7 cards — skip discard, enter robber move immediately
+            
             showCenteredWarning("Click a tile to place Nimon Ungu!", 4000, "#8B4513");
             appendLog("[Robber] No discard needed — entering robber move mode.");
-            // Platform.runLater ensures this runs after any pending engine callbacks
+            
             Platform.runLater(this::enterRobberMoveMode);
             return;
         }
@@ -5757,16 +6030,28 @@ public class GameRevisionView implements GameViewCallback {
 
     private void processNextDiscard() {
         if (discardQueue.isEmpty()) {
-            // Semua player sudah discard → sekarang pindah robber
             appendLog("[Robber] All discards done — entering robber move mode.");
-            Platform.runLater(this::enterRobberMoveMode);
+            
+            
+            boolean robberMoverIsBot = gameController != null
+                    && gameController.getActivePlayer() != null
+                    && gameController.getActivePlayer().isBot();
+            if (!robberMoverIsBot) {
+                Platform.runLater(this::enterRobberMoveMode);
+            }
             return;
         }
         model.player.Player current = discardQueue.poll();
-        // Hanya panggil computeDiscardCount jika player memang perlu discard (>7 kartu)
         if (current.getTotalResourceCount() <= 7) {
             appendLog("[Robber] " + current.getName() + " sudah ≤7 kartu, skip discard.");
-            processNextDiscard(); // langsung next
+            processNextDiscard();
+            return;
+        }
+        if (current.isBot()) {
+            
+            
+            gameController.autoBotDiscardPlayer(current);
+            processNextDiscard();
             return;
         }
         int count = gameController.computeDiscardCount(current);
@@ -5775,8 +6060,8 @@ public class GameRevisionView implements GameViewCallback {
     }
 
     private void showDiscardDialog(model.player.Player player, int count, Runnable onComplete) {
-        // Nimons Purple Effect popup — pakai Nimons Purple Effect.png background
-        // PENTING: Kartu Temuan/Experiment TIDAK BOLEH ditampilkan atau dibuang (spesifikasi)
+        
+        
         double popupW = 1048, popupH = 753;
         double popupX = (DESIGN_WIDTH  - popupW) / 2.0;
         double popupY = (DESIGN_HEIGHT - popupH) / 2.0;
@@ -5796,7 +6081,7 @@ public class GameRevisionView implements GameViewCallback {
         bg.setFitWidth(popupW); bg.setFitHeight(popupH); bg.setPreserveRatio(false);
         popup.getChildren().add(bg);
 
-        // Instruksi — overlay di area sub-heading PNG
+        
         Label subLabel = new Label(player.getName() + "  •  Buang " + count + " kartu resource");
         subLabel.setLayoutX(50); subLabel.setLayoutY(255);
         subLabel.setPrefWidth(popupW - 100); subLabel.setAlignment(Pos.CENTER);
@@ -5811,7 +6096,7 @@ public class GameRevisionView implements GameViewCallback {
         if (arcadeFont != null) selectedLabel.setFont(Font.font(arcadeFont.getFamily(), 10));
         popup.getChildren().add(selectedLabel);
 
-        // Resource cards row — HANYA resource cards, bukan experiment cards
+        
         EnumMap<ResourceType, Integer> discardMap = new EnumMap<>(ResourceType.class);
         for (ResourceType type : ResourceType.values()) discardMap.put(type, 0);
 
@@ -5887,7 +6172,7 @@ public class GameRevisionView implements GameViewCallback {
         }
         popup.getChildren().add(resourceRow);
 
-        // CONFIRM button (hitbox — gambar sudah di PNG)
+        
         Button confirmBtn = new Button();
         confirmBtn.setLayoutX(802); confirmBtn.setLayoutY(643);
         confirmBtn.setPrefWidth(215); confirmBtn.setPrefHeight(70);
@@ -5901,7 +6186,7 @@ public class GameRevisionView implements GameViewCallback {
             }
             designPane.getChildren().remove(overlay);
             gameController.discardResources(player, discardMap);
-            onComplete.run(); // → processNextDiscard() untuk player berikutnya
+            onComplete.run(); 
         });
         popup.getChildren().add(confirmBtn);
 
@@ -5910,13 +6195,13 @@ public class GameRevisionView implements GameViewCallback {
         overlay.toFront();
     }
 
-    // ── Phase gating & centered warnings ────────────────────────────
+    
 
-    /** Shared centered warning label — added to designPane, spans full 1920px width. */
+    
     private Label centeredWarningLabel;
     private Timeline centeredWarningTimeline;
 
-    /** Call once during initialize to create the shared warning overlay. */
+    
     private void setupRollDiceWarning() {
         centeredWarningLabel = new Label();
         centeredWarningLabel.setStyle(
@@ -5929,7 +6214,7 @@ public class GameRevisionView implements GameViewCallback {
         if (arcadeFont != null) {
             centeredWarningLabel.setFont(Font.font(arcadeFont.getFamily(), 20));
         }
-        // Full-width label centered at y=490 (vertical center of 1080 screen)
+        
         centeredWarningLabel.setPrefWidth(DESIGN_WIDTH);
         centeredWarningLabel.setLayoutX(0);
         centeredWarningLabel.setLayoutY(490);
@@ -5939,7 +6224,7 @@ public class GameRevisionView implements GameViewCallback {
         designPane.getChildren().add(centeredWarningLabel);
     }
 
-    /** Show a centered warning message for durationMs milliseconds (color: "red" default). */
+    
     private void showCenteredWarning(String message, double durationMs) {
         showCenteredWarning(message, durationMs, "red");
     }
@@ -6041,7 +6326,7 @@ public class GameRevisionView implements GameViewCallback {
     private void onTradeClicked() {
         if (!requireDiceRolled()) return;
         System.out.println("[TradeUI] Trade button clicked");
-        // Always sync latest resource counts before showing trade UI
+        
         if (gameController != null) {
             syncAllPlayerStocksFromEngine();
             initializeBankTradeResourceSnapshot();
@@ -6111,7 +6396,7 @@ public class GameRevisionView implements GameViewCallback {
 
     @FXML
     private void onBankClicked() {
-        // Bank info always viewable (no dice gate)
+        
         if (!activeInfoPanel.equals("bank")) {
             buildBankCards();
         }
@@ -6138,26 +6423,26 @@ public class GameRevisionView implements GameViewCallback {
     @FXML
     public void onEndTurnClicked() {
         if (!requireDiceRolled()) return;
-        // Jika dadu masih berputar, stop dan selesaikan
+        
         if (diceTimeline != null && diceTimeline.getStatus() == Animation.Status.RUNNING) {
             diceTimeline.stop();
             finalizeDiceRoll();
-            return; // finalizeDiceRoll → engine → callbacks akan lanjutkan flow
+            return; 
         }
         if (gameController != null) {
             try {
-                gameController.endTurn(); // engine fires onTurnChanged + onPhaseChanged
+                gameController.endTurn(); 
             } catch (Exception e) {
                 appendLog("❌ End turn gagal: " + e.getMessage());
             }
         } else {
-            performEndTurn(); // fallback offline
+            performEndTurn(); 
         }
     }
 
     @FXML
     private void onSaveClicked() {
-        // Langsung buka file explorer tanpa popup perantara
+        
         performSaveGame();
     }
 
@@ -6177,10 +6462,10 @@ public class GameRevisionView implements GameViewCallback {
         Label title = new Label("Settings & Plugins");
         title.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #2f2010;");
 
-        // ── Save Game ─────────────────────────────
+        
         VBox saveSection = buildSaveSection(overlay);
 
-        // ── Load Card Plugin ───────────────────────
+        
         VBox pluginSection = buildPluginSection(overlay);
 
         Button cancelBtn = new Button("Close");
@@ -6289,7 +6574,7 @@ public class GameRevisionView implements GameViewCallback {
 
     @FXML
     private void onLoadGameClicked() {
-        // Freeze timer so it can be restored when player cancels and returns
+        
         stopTimer();
         GameSession.pauseGameTimer(remainingSeconds, activePlayerIndex);
         try {

@@ -1,5 +1,7 @@
 package com.bananarepublic.controller;
 
+import com.bananarepublic.trade.TradeOffer;
+
 import engine.DiceResult;
 import engine.TurnPhase;
 import model.board.HexCoordinate;
@@ -7,11 +9,7 @@ import model.card.ExperimentCard;
 import model.player.Player;
 import model.resource.ResourceType;
 
-/**
- * Interface callback yang diimplementasi oleh GameRevisionController.
- * GameController meneruskan semua engine events lewat interface ini
- * sehingga GameController tidak perlu tahu detail implementasi UI.
- */
+
 public interface GameViewCallback {
 
     void onPhaseChanged(TurnPhase newPhase);
@@ -29,4 +27,7 @@ public interface GameViewCallback {
     void onTimerTick(int secondsRemaining);
     void onTimerExpired(Player playerWhoTimedOut);
     void onGameWon(Player winner);
+
+
+    void onBotPlayerTradeProposed(TradeOffer offer);
 }
