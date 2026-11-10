@@ -1,9 +1,6 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/FE4lxIC7)
-![Build](https://img.shields.io/badge/build-passing-brightgreen)
 ![Java](https://img.shields.io/badge/Java-21-orange)
 ![JavaFX](https://img.shields.io/badge/JavaFX-21.0.2-blue)
 ![Maven](https://img.shields.io/badge/Maven-3.6+-red)
-![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 <br/>
 
@@ -66,8 +63,8 @@ JavaFX 21.0.2 is declared as a Maven dependency and will be downloaded automatic
 
 ```bash
 # 1. Clone the repository
-git clone <repository-url>
-cd <repository-directory>
+git clone https://github.com/juanoloando/catan-board-game.git
+cd catan-board-game
 
 # 2. Build the project
 mvn package
