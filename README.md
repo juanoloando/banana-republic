@@ -25,7 +25,6 @@
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [Authors](#authors)
-- [License](#license)
 
 ---
 
@@ -63,8 +62,8 @@ JavaFX 21.0.2 is declared as a Maven dependency and will be downloaded automatic
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/juanoloando/catan-board-game.git
-cd catan-board-game
+git clone https://github.com/juanoloando/banana-republic.git
+cd banana-republic
 
 # 2. Build the project
 mvn package
